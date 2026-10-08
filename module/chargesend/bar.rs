@@ -21,7 +21,7 @@ fn color(position: u16) -> Color {
 pub(crate) fn status_line(label: &str, permille: u16, descending: bool) -> Line<'static> {
     let filled = usize::from(permille.min(1000)) * 12 / 1000;
     let current = Style::default().fg(color(permille));
-    let mut spans = vec![Span::styled(format!("{label} ["), current)];
+    let mut spans = vec![Span::styled(format!("{label:<10} ["), current)];
     for index in 0..12 {
         spans.push(if index < filled {
             Span::styled("=", Style::default().fg(color((index * 1000 / 11) as u16)))
@@ -40,6 +40,16 @@ pub(crate) fn status_line(label: &str, permille: u16, descending: bool) -> Line<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn chargesend_bar_position_stays_fixed_across_efforts() {
+        for label in ["Low", "Medium", "High", "Extra High", "Max"] {
+            assert_eq!(
+                status_line(label, 500, false).to_string().find('['),
+                Some(11)
+            );
+        }
+    }
+
     #[test]
     fn chargesend_gradient_endpoints_and_intermediate_colors() {
         let low = status_line("Low", 0, false);

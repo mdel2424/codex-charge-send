@@ -50,3 +50,11 @@ Default and color checks: with GPT-6.1 Sol, tap Enter and verify Extra High.
 On each fresh hold, verify Extra High and a partially filled orange bar, Max
 at two seconds (red), Low at four seconds (green), then Max again at six.
 Set `CHARGESEND_DEFAULT_EFFORT=high` and repeat to verify the starting tier.
+
+Working-row dock: submit at Max and verify `Max Reasoning` at the right.
+Queue a message while it runs; the label should stay Max until that queued
+turn begins, then show its submitted default. Compare Low, Medium, xHigh,
+and Max: the reasoning slot and the charge bar's opening bracket should stay
+in the same columns. Resize narrower; the reasoning dock should hide before
+it displaces the working timer/interrupt hint, and reappear when widened.
+Check status recreation during tool activity and label removal on cancellation.

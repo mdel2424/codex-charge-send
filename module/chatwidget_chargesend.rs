@@ -35,6 +35,7 @@ pub(super) struct ChargeSend {
     controller: Controller<Context, ReasoningEffortConfig>,
     pub(super) terminal_available: bool,
     default_effort: ReasoningEffortConfig,
+    active_effort: Option<ReasoningEffortConfig>,
     announced: bool,
     pub(super) has_charged: bool,
     echoes: VecDeque<ExpectedSettings>,
@@ -52,6 +53,7 @@ impl Default for ChargeSend {
                 std::env::var("CHARGESEND_DEFAULT_EFFORT").ok().as_deref(),
             ),
             has_charged: false,
+            active_effort: None,
             echoes: VecDeque::new(),
         }
     }
@@ -284,6 +286,13 @@ impl ChatWidget {
     }
 
     pub(super) fn note_chargesend_request(&mut self, sent: CollaborationMode, charged: bool) {
+        if !self.is_user_turn_pending_or_running() {
+            self.chargesend.active_effort = sent.reasoning_effort().or_else(|| {
+                self.current_model_preset()
+                    .map(|preset| preset.default_reasoning_effort)
+            });
+            self.chargesend_update_working_label();
+        }
         self.chargesend.has_charged |= charged;
         if self.chargesend.has_charged {
             // Server settings notifications have no request ID. Recognize only
@@ -294,6 +303,42 @@ impl ChatWidget {
             }
             self.chargesend.echoes.push_back(ExpectedSettings { sent });
         }
+    }
+
+    fn chargesend_update_working_label(&mut self) {
+        let label = self.chargesend.active_effort.as_ref().map(|effort| {
+            let name = effort.to_string();
+            let name = if name == "xhigh" {
+                "xHigh".to_owned()
+            } else {
+                let mut chars = name.chars();
+                chars.next().map_or_else(String::new, |first| {
+                    first.to_uppercase().collect::<String>() + chars.as_str()
+                })
+            };
+            format!("{name} Reasoning")
+        });
+        self.bottom_pane.set_chargesend_reasoning_label(label);
+    }
+
+    /// Resume/externally started turns use restored thread effort when no local
+    /// accepted submission supplied it. Local charge overrides stay frozen.
+    pub(crate) fn chargesend_begin_working(&mut self) {
+        if self.chargesend.active_effort.is_none() {
+            self.chargesend.active_effort = self
+                .effective_collaboration_mode()
+                .reasoning_effort()
+                .or_else(|| {
+                    self.current_model_preset()
+                        .map(|preset| preset.default_reasoning_effort)
+                });
+        }
+        self.chargesend_update_working_label();
+    }
+
+    pub(crate) fn chargesend_finish_working(&mut self) {
+        self.chargesend.active_effort = None;
+        self.bottom_pane.set_chargesend_reasoning_label(None);
     }
 
     /// Stop backend echoes of prompt-local overrides from changing UI defaults.

@@ -198,7 +198,7 @@ def test_source(source: Path) -> None:
     run(["cargo", "fmt", "--all"], cwd=workspace, capture=True)
     record_prepared_files(source)
     run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace, capture=True)
-    for filter_name in ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests"]:
+    for filter_name in ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests", "status_indicator_widget::tests"]:
         run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace)
 
 

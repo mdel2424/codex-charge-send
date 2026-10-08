@@ -633,19 +633,19 @@ async fn chargesend_bar_uses_measured_composer_space_at_narrow_widths() {
     › hello
 
 
-      Low [-
+      Low
 
     24 columns:
 
     › hello
 
-      Low [------------] ^ ·
+      Low        [----------
 
     80 columns:
 
     › hello
 
-      Low [------------] ^ · release Enter to send · Esc cancels
+      Low        [------------] ^ · release Enter to send · Esc cancels
     ");
 }
 
@@ -733,4 +733,87 @@ fn chargesend_configured_default_and_supported_fallback() {
         ),
         ReasoningEffortConfig::High
     );
+}
+
+fn working_text(chat: &ChatWidget) -> String {
+    let width = 80;
+    let area = ratatui::layout::Rect::new(0, 0, width, chat.bottom_pane.desired_height(width));
+    let mut buffer = ratatui::buffer::Buffer::empty(area);
+    chat.bottom_pane.render(area, &mut buffer);
+    buffer
+        .content
+        .iter()
+        .map(ratatui::buffer::Cell::symbol)
+        .collect()
+}
+
+#[tokio::test(start_paused = true)]
+async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
+    let (mut chat, _rx, mut op_rx) = fixture().await;
+    catalog(
+        &mut chat,
+        vec![
+            ReasoningEffortConfig::Low,
+            ReasoningEffortConfig::Medium,
+            ReasoningEffortConfig::High,
+            ReasoningEffortConfig::XHigh,
+            ReasoningEffortConfig::Max,
+        ],
+    );
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::XHigh));
+    enter(&mut chat, KeyEventKind::Press);
+    tokio::time::advance(Duration::from_secs(2)).await;
+    chat.paint_chargesend();
+    enter(&mut chat, KeyEventKind::Release);
+    assert_effort(
+        &next_submit_op(&mut op_rx),
+        ReasoningEffortConfig::Max,
+        ModeKind::Default,
+    );
+    chat.on_task_started();
+    assert_eq!(
+        chat.chargesend.active_effort,
+        Some(ReasoningEffortConfig::Max)
+    );
+    assert!(working_text(&chat).contains("Max Reasoning"));
+    draft(&mut chat, "queued follow-up");
+    chat.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    assert!(chat.input_queue.has_queued_follow_up_messages());
+    assert_no_submit_op(&mut op_rx);
+    assert!(working_text(&chat).contains("Max Reasoning"));
+    // Streaming can temporarily remove and recreate the status row.
+    chat.bottom_pane.hide_status_indicator();
+    chat.bottom_pane.ensure_status_indicator();
+    assert!(working_text(&chat).contains("Max Reasoning"));
+    chat.on_task_complete(None, None, false);
+    assert_effort(
+        &next_submit_op(&mut op_rx),
+        ReasoningEffortConfig::XHigh,
+        ModeKind::Default,
+    );
+    chat.on_task_started();
+    assert!(working_text(&chat).contains("xHigh Reasoning"));
+    assert_eq!(
+        chat.chargesend.active_effort,
+        Some(ReasoningEffortConfig::XHigh)
+    );
+    chat.on_task_complete(None, None, false);
+    assert!(chat.chargesend.active_effort.is_none());
+    assert!(!working_text(&chat).contains("Reasoning"));
+}
+
+#[tokio::test]
+async fn chargesend_working_label_restores_effort_and_ignores_busy_steering() {
+    let (mut chat, _rx, mut op_rx) = fixture().await;
+    chat.on_task_started();
+    assert!(working_text(&chat).contains("High Reasoning"));
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::Medium));
+    draft(&mut chat, "steer this turn");
+    enter(&mut chat, KeyEventKind::Press);
+    let _steer = next_submit_op(&mut op_rx);
+    assert_eq!(
+        chat.chargesend.active_effort,
+        Some(ReasoningEffortConfig::High)
+    );
+    assert!(working_text(&chat).contains("High Reasoning"));
 }

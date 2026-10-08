@@ -20,6 +20,17 @@ composer footer. `module/chargesend/bar.rs` renders styled spans with a
 green–yellow–red gradient and a label colored by charge position.
 `CHARGESEND_DEFAULT_EFFORT` defaults to xhigh; the model-specific starting
 tier is resolved before charging. Tap and every new press use that tier.
+The charge bar pads the effort name to a fixed ten-character field.
+
+`module/chargesend/status.rs` reserves twenty columns at the right of the
+Working row for the active turn's reasoning label, plus a three-column separator.
+The working controls remain left-aligned. Background activity truncates before
+the dock and hook activity can overflow to its usual details row. When the
+core controls cannot fit alongside the dock, the label hides without adding a
+row. Accepted new submissions capture their effective request effort; busy
+steering and queueing leave the active value unchanged. Turn start restores
+the label after status-row recreation, and completion/finalization clears it
+before the next queued submission. Restored turns fall back to thread effort.
 
 `module/app_chargesend.rs` invalidates charging before overlays and transitions
 can take ownership. Its key latch outlives widget replacement, so a held key from

@@ -5,6 +5,7 @@
 mod bar;
 pub(crate) mod capability;
 mod controller;
+pub(crate) mod status;
 pub(crate) use bar::status_line;
 
 pub(crate) use controller::Controller;

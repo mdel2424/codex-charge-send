@@ -50,7 +50,7 @@
 @@ -1,3 +1,4 @@
 +// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
  //! App-level orchestration tests for the TUI.
- 
+
  #[path = "tests/mcp_login_tests.rs"]
 @@ -6099,6 +6100,7 @@
          terminal_title_invalid_items_warned: Arc::new(AtomicBool::new(false)),
@@ -84,7 +84,7 @@
  mod config_persistence;
  mod connector_mentions;
 @@ -582,6 +584,7 @@
- 
+
      // Esc-backtracking state grouped
      pub(crate) backtrack: crate::app_backtrack::BacktrackState,
 +    chargesend_enter_down: bool,
@@ -117,7 +117,7 @@
  //! One resolved layout supplies the status, input, popup, and hint rectangles to each consumer.
 @@ -133,6 +134,9 @@
      }
- 
+
      pub(super) fn footer_hint_height(&self, width: u16, options: ComposerRenderOptions<'_>) -> u16 {
 +        if self.chargesend_status.is_some() {
 +            return 1;
@@ -191,7 +191,7 @@
 +                        tokio::time::Instant::now().into_std(),
 +                    ))
      }
- 
+
      /// Handle a key event coming from the main UI.
 @@ -5036,6 +5070,10 @@
          if options.footer.is_some_and(|footer| footer.is_interactive) {
@@ -203,7 +203,7 @@
 +        }
      }
  }
- 
+
 --- a/codex-rs/tui/src/bottom_pane/mod.rs
 +++ b/codex-rs/tui/src/bottom_pane/mod.rs
 @@ -1,3 +1,4 @@
@@ -211,27 +211,60 @@
  //! The bottom pane is the interactive footer of the chat UI.
  //!
  //! The pane owns the [`ChatComposer`] (editable prompt input) and a stack of transient
-@@ -1781,6 +1782,14 @@
+@@ -304,6 +305,8 @@
+
+     /// Inline status indicator shown above the composer while a task is running.
+     status: Option<StatusIndicatorWidget>,
++    /// Accepted turn effort survives temporary status-row recreation.
++    chargesend_reasoning_label: Option<String>,
+     /// Running-hook summary supplied by the lifecycle owner after its reveal delay.
+     hook_status_message: Option<String>,
+     inline_banner: Option<actionable_banner::InlineBanner>,
+@@ -384,6 +387,7 @@
+             disable_paste_burst,
+             is_task_running: false,
+             status: None,
++            chargesend_reasoning_label: None,
+             hook_status_message: None,
+             inline_banner: None,
+             status_timer: crate::status_indicator_widget::StatusTimer::default(),
+@@ -1681,8 +1685,15 @@
+     ///
+     /// This keeps status-line inline text synchronized without forcing the
+     /// standalone unified-exec footer row to be visible.
++    pub(crate) fn set_chargesend_reasoning_label(&mut self, label: Option<String>) {
++        self.chargesend_reasoning_label = label;
++        self.sync_status_inline_message();
++        self.request_redraw();
++    }
++
+     fn sync_status_inline_message(&mut self) {
+         if let Some(status) = self.status.as_mut() {
++            status.update_reasoning_label(self.chargesend_reasoning_label.clone());
+             status.update_inline_message(self.unified_exec_footer.summary_text());
+             status.update_hook_status_message(self.hook_status_message.clone());
+         }
+@@ -1779,6 +1790,14 @@
+     /// running and some are not.
+     pub(crate) fn no_modal_or_popup_active(&self) -> bool {
          self.can_launch_external_editor()
-     }
- 
++    }
++
 +    pub(crate) fn chargesend_eligible(&self) -> bool {
 +        self.no_modal_or_popup_active() && self.composer.chargesend_eligible()
 +    }
 +
 +    pub(crate) fn set_chargesend_status(&mut self, status: Option<ratatui::text::Line<'static>>) {
 +        self.composer.chargesend_status = status;
-+    }
-+
-     pub(crate) fn end_composer_drag(&mut self) {
-         self.composer.end_mouse_drag();
      }
+
+     pub(crate) fn end_composer_drag(&mut self) {
 --- a/codex-rs/tui/src/chatwidget/constructor.rs
 +++ b/codex-rs/tui/src/chatwidget/constructor.rs
 @@ -1,3 +1,4 @@
 +// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
  //! Construction and initial wiring for `ChatWidget`.
- 
+
  use super::*;
 @@ -137,6 +138,7 @@
              remote_connection: None,
@@ -255,7 +288,7 @@
 +    prompt_effort: Option<chargesend::PromptEffort>,
      result: oneshot::Receiver<Result<Vec<UserInput>, String>>,
  }
- 
+
 @@ -25,6 +27,16 @@
          message: UserMessage,
          history_record: UserMessageHistoryRecord,
@@ -297,7 +330,7 @@
                  if !accepted {
                      self.input_queue.recovered_queue |=
 @@ -99,6 +113,15 @@
- 
+
      pub(super) fn requeue_image_submission(&mut self) {
          if let Some(pending) = self.pending_image_submission.take() {
 +            if pending.prompt_effort.is_some() {
@@ -374,7 +407,7 @@
 @@ -1,3 +1,4 @@
 +// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
  //! User-message and shell-prompt submission behavior for `ChatWidget`.
- 
+
  use super::*;
 @@ -134,6 +135,40 @@
          source: UserMessageSource,
@@ -455,7 +488,7 @@
 @@ -393,7 +434,12 @@
              }
          }
- 
+
 -        let effective_mode = self.effective_collaboration_mode();
 +        let intended_mode = self.effective_collaboration_mode();
 +        let effective_mode = if prompt_effort.is_some() || self.chargesend.has_charged {
@@ -469,7 +502,7 @@
 @@ -414,7 +460,11 @@
          self.maybe_apply_ide_context(&mut items);
          crate::task_mentions::apply_task_references(&mut items, &mention_bindings, self.thread_id);
- 
+
 -        let collaboration_mode = if self.collaboration_modes_enabled() {
 +        let collaboration_mode = if prompt_effort.is_some() || self.chargesend.has_charged {
 +            // A collaboration mask can supersede the top-level effort. Carry
@@ -495,11 +528,11 @@
 @@ -1,3 +1,4 @@
 +// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
  //! Key routing and composer-adjacent UI interaction for `ChatWidget`.
- 
+
  use super::clipboard::PendingCopy;
 @@ -58,6 +59,14 @@
      }
- 
+
      pub(crate) fn handle_key_event(&mut self, key_event: KeyEvent) -> KeyEventAction {
 +        if self.handle_chargesend_key(key_event) {
 +            return KeyEventAction::None;
@@ -514,7 +547,7 @@
          }
 @@ -470,6 +479,7 @@
      }
- 
+
      pub(crate) fn handle_paste(&mut self, text: String) {
 +        self.cancel_chargesend();
          if self.external_writer_view && !self.bottom_pane.has_active_view() {
@@ -530,7 +563,7 @@
 @@ -148,7 +149,7 @@
          true
      }
- 
+
 -    fn current_model_preset(&self) -> Option<ModelPreset> {
 +    pub(super) fn current_model_preset(&self) -> Option<ModelPreset> {
          let current_model = self.current_model();
@@ -556,7 +589,7 @@
 @@ -1,3 +1,4 @@
 +// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
  //! Runtime settings state and model/collaboration coordination for `ChatWidget`.
- 
+
  use super::*;
 @@ -465,6 +466,7 @@
      /// header/title (`refresh_model_display`) but forget the footer status line
@@ -568,13 +601,44 @@
          self.refresh_status_line();
 @@ -472,6 +474,8 @@
      }
- 
+
      fn apply_thread_settings(&mut self, mut settings: ThreadSettings) {
 +        self.cancel_chargesend();
 +        self.normalize_chargesend_echo(&mut settings);
          self.invalidate_permission_discovery();
          let cwd_changed = self.config.cwd != settings.cwd;
          self.apply_thread_settings_cwd(settings.cwd.clone());
+--- a/codex-rs/tui/src/chatwidget/turn_runtime.rs
++++ b/codex-rs/tui/src/chatwidget/turn_runtime.rs
+@@ -1,3 +1,4 @@
++// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
+ //! Agent turn lifecycle and runtime bookkeeping for `ChatWidget`.
+ //!
+ //! This module owns task start/completion state, runtime metrics, plan updates,
+@@ -75,6 +76,7 @@
+     // Raw reasoning uses the same flow as summarized reasoning
+
+     pub(super) fn on_task_started(&mut self) {
++        self.chargesend_begin_working();
+         self.bottom_pane.dismiss_composer_sparkle();
+         self.clear_context_compaction();
+         self.input_queue.user_turn_pending_start = false;
+@@ -177,6 +179,7 @@
+         self.clear_active_hook_cell();
+         self.clear_guardian_review_status();
+         self.turn_lifecycle.finish();
++        self.chargesend_finish_working();
+         self.clear_safety_buffering();
+         self.update_task_running_state();
+         self.running_commands.clear();
+@@ -337,6 +340,7 @@
+         self.input_queue.user_turn_pending_start = false;
+         self.clear_guardian_review_status();
+         self.turn_lifecycle.finish();
++        self.chargesend_finish_working();
+         self.update_task_running_state();
+         self.running_commands.clear();
+         self.suppressed_exec_calls.clear();
 --- a/codex-rs/tui/src/chatwidget.rs
 +++ b/codex-rs/tui/src/chatwidget.rs
 @@ -1,3 +1,4 @@
@@ -613,6 +677,85 @@
  mod chatwidget;
  mod cli;
  mod clipboard_copy;
+--- a/codex-rs/tui/src/status_indicator_widget.rs
++++ b/codex-rs/tui/src/status_indicator_widget.rs
+@@ -1,10 +1,13 @@
++// Modified for ChargeSend by ChargeSend contributors, 2026 (Apache-2.0).
+ //! A live task status row rendered above the composer while the agent is busy.
+ //!
+ //! The row renders a separately owned clock, the optional interrupt hint, and short inline
+ //! context (for example, the unified-exec background-process summary). Keeping
+ //! these pieces on one line avoids vertical layout churn in the bottom pane.
+ //! Hook activity uses the remaining space or its own line on overflow, so it
+-//! never displaces background-process controls.
++//! never displaces background-process controls. ChargeSend docks active-turn
++//! reasoning in a fixed-width right-hand slot when the core controls fit; it
++//! hides the slot on narrow rows rather than wrapping or shifting the controls.
+
+ use std::time::Duration;
+ use std::time::Instant;
+@@ -60,6 +63,7 @@
+     details_max_lines: usize,
+     /// Optional suffix rendered after the elapsed/interrupt segment.
+     inline_message: Option<String>,
++    reasoning_label: Option<String>,
+     /// Hook activity may move below the status row when it cannot fit in full.
+     hook_status_message: Option<String>,
+     show_interrupt_hint: bool,
+@@ -101,6 +105,7 @@
+             details: None,
+             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
+             inline_message: None,
++            reasoning_label: None,
+             hook_status_message: None,
+             show_interrupt_hint: true,
+             interrupt_binding: Some(key_hint::plain(KeyCode::Esc).into()),
+@@ -153,6 +158,10 @@
+             .filter(|message| !message.is_empty());
+     }
+
++    pub(crate) fn update_reasoning_label(&mut self, label: Option<String>) {
++        self.reasoning_label = label;
++    }
++
+     pub(crate) fn update_hook_status_message(&mut self, message: Option<String>) {
+         self.hook_status_message = message;
+     }
+@@ -258,6 +267,11 @@
+         } else {
+             spans.push(format!("({pretty_elapsed})").dim());
+         }
++        let content_width = crate::chargesend::status::content_width(
++            width,
++            line_width(&Line::from(spans.clone())),
++            row.reasoning_label.as_deref(),
++        );
+         if let Some(message) = &row.inline_message {
+             // Keep optional context after elapsed/interrupt text so that core
+             // interrupt affordances stay in a fixed visual location.
+@@ -269,7 +283,7 @@
+         let mut hook_overflow = None;
+         if let Some(message) = &row.hook_status_message {
+             if line_width(&header) + display_width(" · ") + display_width(message)
+-                <= usize::from(width)
++                <= usize::from(content_width)
+             {
+                 header.spans.extend([" · ".dim(), message.clone().dim()]);
+             } else {
+@@ -280,9 +294,11 @@
+             }
+         }
+         let mut lines = Vec::new();
+-        lines.push(truncate_line_with_ellipsis_if_overflow(
++        lines.push(crate::chargesend::status::dock_reasoning(
+             header,
+-            usize::from(width),
++            row.reasoning_label.as_deref(),
++            width,
++            content_width,
+         ));
+         lines.extend(hook_overflow);
+         lines.extend(row.wrapped_details_lines(width));
 --- a/codex-rs/tui/src/terminal_probe.rs
 +++ b/codex-rs/tui/src/terminal_probe.rs
 @@ -1,3 +1,4 @@
@@ -644,11 +787,11 @@
 +        crate::chargesend::capability::requested(false);
          return tmux_options.mouse_capture;
      }
- 
+
 @@ -220,15 +222,34 @@
          None
      };
- 
+
 -    let _ = execute!(
 +    let charge_terminal = crate::chargesend::capability::allowed_terminal(
 +        terminal_info().name == TerminalName::Kitty,
@@ -684,6 +827,6 @@
 +    )
 +    .is_ok();
 +    crate::chargesend::capability::requested(charge_terminal && enabled);
- 
+
      if tmux_should_enable_modify_other_keys_for(running_in_tmux_session, tmux_extended_keys_format)
      {

@@ -8,5 +8,6 @@
   "module/chargesend/controller_tests.rs": "codex-rs/tui/src/chargesend/controller_tests.rs",
   "module/chargesend/capability_tests.rs": "codex-rs/tui/src/chargesend/capability_tests.rs",
   "module/app_chargesend_tests.rs": "codex-rs/tui/src/app/app_chargesend_tests.rs",
-  "module/chargesend/bar.rs": "codex-rs/tui/src/chargesend/bar.rs"
+  "module/chargesend/bar.rs": "codex-rs/tui/src/chargesend/bar.rs",
+  "module/chargesend/status.rs": "codex-rs/tui/src/chargesend/status.rs"
 }

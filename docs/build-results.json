@@ -6,35 +6,37 @@
   "releases": {
     "rust-v0.161.0": {
       "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
-      "patch_fingerprint": "9c74c608fb79d47a0a404dd73361e30760e8624622ad9938d6bcfb5d2b749fc0",
-      "binary_sha256": "6c46e731c807774030b5fc7d4a71ceb1245026cf2d4644413881325f59249d13",
+      "patch_fingerprint": "f22c4841c852bcf129ce5acaade733b90689d73e49c2f82fbe30e17772dd4560",
+      "binary_sha256": "2074792075261fcaa7c650651748cb19bac9549ca2bc25914958e831099a0cc5",
       "bundle": "dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 31,
+        "chargesend": 38,
         "composer": 396,
         "plan_mode": 63,
-        "event_stream": 10
+        "event_stream": 10,
+        "working_status": 10
       },
-      "total_rust_tests": 500,
-      "clippy": "previous revision passed; not rerun for default/gradient change",
+      "total_rust_tests": 517,
+      "clippy": "previous revision passed; not rerun for working-dock change",
       "code_mode_host_sha256": "e87096087c02aa6ab90a5a85031659665aa0bf3ee20c07ca0b8ab701c83fcd5b",
       "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     },
     "rust-v0.160.0": {
       "upstream_commit": "a956835d020762cb2b570053af06f643a11c0ecc",
-      "patch_fingerprint": "b01d9278767ada6b3943c5781d4de754083b2cbebace871a2c77d90114a45c72",
-      "binary_sha256": "c3d633b8dadec35fb940ca6c0832af12df093e343f0d73ee602f2bafbd53ce6b",
+      "patch_fingerprint": "6e891f8647db4ddd0e395cb5d13a8f81a481d082a7e4bb7a9020a3485b91ffe8",
+      "binary_sha256": "d63390f572e853fbfd4e0f5edfab480d5636be5d3a66cf5085ef4f322724ce88",
       "bundle": "dist/chargesend-0.1.0-codex-0.160.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 31,
+        "chargesend": 38,
         "composer": 387,
         "plan_mode": 63,
-        "event_stream": 10
+        "event_stream": 10,
+        "working_status": 10
       },
-      "total_rust_tests": 491,
-      "clippy": "previous revision passed; not rerun for default/gradient change",
+      "total_rust_tests": 508,
+      "clippy": "previous revision passed; not rerun for working-dock change",
       "code_mode_host_sha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
       "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     }

@@ -84,8 +84,8 @@ are unavailable, Enter sends normally and the UI shows an unavailable notice.
 
 | Codex baseline | Automated verification |
 | --- | --- |
-| 0.161.0 | Native CLI built; 500 Rust tests passed. |
-| 0.160.0 | Native CLI built; 491 Rust tests passed; physical UI check pending. |
+| 0.161.0 | Native CLI built; 517 Rust tests passed. |
+| 0.160.0 | Native CLI built; 508 Rust tests passed; physical UI check pending. |
 
 The [verification record](docs/verification.md) distinguishes automated results
 from physical checks. The full [manual checklist](docs/manual-testing.md) still
@@ -96,7 +96,12 @@ needs completion, including release-to-submit in the actual UI.
 The bar uses the active model's supported efforts through Max, including Max
 without first selecting it in settings. Ultra is excluded from the charge bar.
 For GPT-6.1 Sol, a tap sends Extra High. Hold to the peak to send at Max.
-The colored bar runs from green at Low through yellow to red at Max. The charge applies to the
+The colored bar runs from green at Low through yellow to red at Max.
+Its label has a fixed width so tier changes keep the bar anchored. During a
+turn, the submitted effort appears in a fixed-width slot at the right of the
+Working row, for example `xHigh Reasoning`. Queueing or steering does not
+replace that active-turn label. The slot hides when the core working controls
+need the available width. The charge applies to the
 submitted request, including Plan mode, without writing to `config.toml`.
 Later submissions explicitly use their intended effort. The backend can retain
 the charged thread setting until the next submission; restart/resume and
