@@ -6,36 +6,40 @@
   "releases": {
     "rust-v0.161.0": {
       "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
-      "patch_fingerprint": "690f6320f071d35993e66eae63b2e798e135f0dedd60d044e404b6726ed72cb5",
-      "binary_sha256": "252144ce085007b30cc9a6bbf871f23ab22fea8acbcc2b093d41578522d3014f",
+      "patch_fingerprint": "9c74c608fb79d47a0a404dd73361e30760e8624622ad9938d6bcfb5d2b749fc0",
+      "binary_sha256": "6c46e731c807774030b5fc7d4a71ceb1245026cf2d4644413881325f59249d13",
       "bundle": "dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 26,
+        "chargesend": 31,
         "composer": 396,
         "plan_mode": 63,
         "event_stream": 10
       },
-      "total_rust_tests": 495,
-      "clippy": "passed"
+      "total_rust_tests": 500,
+      "clippy": "previous revision passed; not rerun for default/gradient change",
+      "code_mode_host_sha256": "e87096087c02aa6ab90a5a85031659665aa0bf3ee20c07ca0b8ab701c83fcd5b",
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     },
     "rust-v0.160.0": {
       "upstream_commit": "a956835d020762cb2b570053af06f643a11c0ecc",
-      "patch_fingerprint": "ab646ac16b768d5b01b75b859db48176af0ed198c045c8f64637258b2e2a7a76",
-      "binary_sha256": "3b312e9a46eb523902c755b14325b4d072d2fdc124d904e612519c35f63aa0f0",
+      "patch_fingerprint": "b01d9278767ada6b3943c5781d4de754083b2cbebace871a2c77d90114a45c72",
+      "binary_sha256": "c3d633b8dadec35fb940ca6c0832af12df093e343f0d73ee602f2bafbd53ce6b",
       "bundle": "dist/chargesend-0.1.0-codex-0.160.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 26,
+        "chargesend": 31,
         "composer": 387,
         "plan_mode": 63,
         "event_stream": 10
       },
-      "total_rust_tests": 486,
-      "clippy": "passed"
+      "total_rust_tests": 491,
+      "clippy": "previous revision passed; not rerun for default/gradient change",
+      "code_mode_host_sha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     }
   },
-  "python_workflow_tests": 12,
+  "python_workflow_tests": 21,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "prepared locally, not run",

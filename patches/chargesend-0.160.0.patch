@@ -140,8 +140,8 @@
 +//! forwards a synthetic press to this normal submission path only on release.
 +//! Popups, slash/shell commands, Vim command mode, and paste-burst newline
 +//! suppression bypass charging. Other release events remain ignored here.
-+//! Its transient bar uses the measured composer footer, without changing draft
-+//! text, attachment handling, newline shortcuts, or the user's effort setting.
++//! Its colored bar starts at the configured tap effort in the composer footer;
++//! drafts, attachments, newline shortcuts, and saved effort settings stay intact.
  //! Owned transcripts keep persistent status below the composer and hints on a separate final row.
  //! Shortcut help expands above the composer, with its close hint replacing the final shortcuts row
  //! so input and persistent status stay anchored when help opens or closes.
@@ -149,7 +149,7 @@
      frame_requester: Option<FrameRequester>,
      sparkle: sparkle::Sparkle,
      effort_tier: Option<EffortTier>,
-+    pub(super) chargesend_status: Option<String>,
++    pub(super) chargesend_status: Option<ratatui::text::Line<'static>>,
      effort_animation_style: Option<IgnitionStyle>,
      effort_ignition: Option<EffortIgnition>,
      voice_strip: Option<VoiceStrip>,
@@ -198,7 +198,7 @@
          }
 +        if let Some(status) = &self.chargesend_status {
 +            ratatui::widgets::Clear.render(transcript_hint_area, buf);
-+            Paragraph::new(status.as_str()).render(transcript_hint_area, buf);
++            Paragraph::new(status.clone()).render(transcript_hint_area, buf);
 +        }
      }
  }
@@ -218,7 +218,7 @@
 +        self.no_modal_or_popup_active() && self.composer.chargesend_eligible()
 +    }
 +
-+    pub(crate) fn set_chargesend_status(&mut self, status: Option<String>) {
++    pub(crate) fn set_chargesend_status(&mut self, status: Option<ratatui::text::Line<'static>>) {
 +        self.composer.chargesend_status = status;
 +    }
 +

@@ -1,8 +1,8 @@
 // Copyright 2026 ChargeSend contributors. Licensed under Apache-2.0.
 use super::*;
 
-fn context() -> (u32, Vec<&'static str>) {
-    (1, vec!["low", "medium", "high"])
+fn context() -> (u32, Vec<&'static str>, &'static str) {
+    (1, vec!["low", "medium", "high"], "low")
 }
 
 fn begin() -> (Controller<u32, &'static str>, Instant) {
@@ -135,7 +135,11 @@ fn chargesend_escape_invalidation_and_edit_cancel_until_release() {
             Outcome::Consume
         );
     }
-    for eligible in [None, Some((2, context().1)), Some((1, vec!["low"]))] {
+    for eligible in [
+        None,
+        Some((2, context().1, "low")),
+        Some((1, vec!["low"], "low")),
+    ] {
         let (mut charge, now) = begin();
         assert_eq!(
             charge.handle(Input::EnterRelease, eligible, now),
@@ -152,10 +156,10 @@ fn chargesend_fallback_and_single_model_tier() {
     assert_eq!(charge.handle(Input::EnterPress, None, now), Outcome::Pass);
     assert_eq!(charge.handle(Input::EnterRelease, None, now), Outcome::Pass);
     assert_eq!(
-        charge.handle(Input::EnterPress, Some((1, Vec::new())), now),
+        charge.handle(Input::EnterPress, Some((1, Vec::new(), "low")), now),
         Outcome::Pass
     );
-    charge.handle(Input::EnterPress, Some((1, vec!["custom"])), now);
+    charge.handle(Input::EnterPress, Some((1, vec!["custom"], "custom")), now);
     assert_eq!(
         charge.paint(now + Duration::from_secs(2)).unwrap().effort,
         "custom"
@@ -188,5 +192,49 @@ fn chargesend_adjustable_timing_and_invalid_values() {
     assert_eq!(
         charge.paint(now + Duration::from_secs(2)).unwrap().permille,
         0
+    );
+}
+
+#[test]
+fn chargesend_configured_start_peak_low_and_reset() {
+    let now = Instant::now();
+    let context = || (1, vec!["low", "medium", "high", "xhigh", "max"], "xhigh");
+    let mut charge = Controller::new(Timing::default());
+    charge.handle(Input::EnterPress, Some(context()), now);
+    for (ms, effort, permille, descending) in [
+        (0, "xhigh", 750, false),
+        (150, "xhigh", 750, false),
+        (1000, "max", 875, false),
+        (2000, "max", 1000, true),
+        (3000, "high", 500, true),
+        (4000, "low", 0, false),
+        (6000, "max", 1000, true),
+    ] {
+        assert_eq!(
+            charge.paint(now + Duration::from_millis(ms)),
+            Some(Snapshot {
+                effort,
+                permille,
+                descending
+            })
+        );
+    }
+    assert_eq!(
+        charge.handle(
+            Input::EnterRelease,
+            Some(context()),
+            now + Duration::from_secs(6)
+        ),
+        Outcome::Submit("max")
+    );
+    let next = now + Duration::from_secs(7);
+    charge.handle(Input::EnterPress, Some(context()), next);
+    assert_eq!(
+        charge.handle(
+            Input::EnterRelease,
+            Some(context()),
+            next + Duration::from_millis(150)
+        ),
+        Outcome::Submit("xhigh")
     );
 }

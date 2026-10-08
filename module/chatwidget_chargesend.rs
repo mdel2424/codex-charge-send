@@ -34,6 +34,7 @@ struct ExpectedSettings {
 pub(super) struct ChargeSend {
     controller: Controller<Context, ReasoningEffortConfig>,
     pub(super) terminal_available: bool,
+    default_effort: ReasoningEffortConfig,
     announced: bool,
     pub(super) has_charged: bool,
     echoes: VecDeque<ExpectedSettings>,
@@ -47,10 +48,46 @@ impl Default for ChargeSend {
             // Existing upstream fixtures should not gain environment-specific
             // history. ChargeSend tests explicitly enable the notice when needed.
             announced: cfg!(test),
+            default_effort: configured_default(
+                std::env::var("CHARGESEND_DEFAULT_EFFORT").ok().as_deref(),
+            ),
             has_charged: false,
             echoes: VecDeque::new(),
         }
     }
+}
+
+fn configured_default(value: Option<&str>) -> ReasoningEffortConfig {
+    match value.unwrap_or("xhigh") {
+        "low" => ReasoningEffortConfig::Low,
+        "medium" => ReasoningEffortConfig::Medium,
+        "high" => ReasoningEffortConfig::High,
+        "max" => ReasoningEffortConfig::Max,
+        _ => ReasoningEffortConfig::XHigh,
+    }
+}
+
+fn starting_effort(
+    choices: &[ReasoningEffortConfig],
+    default: &ReasoningEffortConfig,
+) -> ReasoningEffortConfig {
+    if choices.contains(default) {
+        return default.clone();
+    }
+    let rank = |effort: &ReasoningEffortConfig| match effort {
+        ReasoningEffortConfig::Low => 1,
+        ReasoningEffortConfig::Medium => 2,
+        ReasoningEffortConfig::High => 3,
+        ReasoningEffortConfig::XHigh => 4,
+        ReasoningEffortConfig::Max => 5,
+        _ => 0,
+    };
+    choices
+        .iter()
+        .filter(|effort| rank(effort) <= rank(default))
+        .max_by_key(|effort| rank(effort))
+        .unwrap_or(&choices[0])
+        .clone()
 }
 
 impl ChatWidget {
@@ -58,22 +95,20 @@ impl ChatWidget {
         let Some(preset) = self.current_model_preset() else {
             return Vec::new();
         };
-        let explicit = self.effective_reasoning_effort();
         let mut choices = Vec::new();
         for option in preset.supported_reasoning_efforts {
-            // Only the advanced tier already explicitly selected in the active
-            // settings is opted in. Never infer opt-in from a model default.
-            if (!Self::is_advanced_reasoning_effort(&option.effort)
-                || explicit.as_ref() == Some(&option.effort))
-                && !choices.contains(&option.effort)
-            {
+            // Personal-use charge range includes advertised Max without changing
+            // the default effort first. Ultra stays outside the charge bar.
+            if option.effort != ReasoningEffortConfig::Ultra && !choices.contains(&option.effort) {
                 choices.push(option.effort);
             }
         }
         choices
     }
 
-    fn chargesend_context(&self) -> Option<(Context, Vec<ReasoningEffortConfig>)> {
+    fn chargesend_context(
+        &self,
+    ) -> Option<(Context, Vec<ReasoningEffortConfig>, ReasoningEffortConfig)> {
         if !self.chargesend.terminal_available
             || self.blocks_direct_input
             || self.fork_in_progress
@@ -102,7 +137,8 @@ impl ChatWidget {
                 mode: self.effective_collaboration_mode(),
                 draft: self.bottom_pane.composer_text(),
             },
-            choices,
+            choices.clone(),
+            starting_effort(&choices, &self.chargesend.default_effort),
         ))
     }
 
@@ -134,13 +170,10 @@ impl ChatWidget {
         self.chargesend.controller.validate(context.as_ref());
         let now = tokio::time::Instant::now().into_std();
         let status = self.chargesend.controller.paint(now).map(|snapshot| {
-            let filled = usize::from(snapshot.permille) * 12 / 1000;
-            let direction = if snapshot.descending { "v" } else { "^" };
-            format!(
-                "{} [{}{}] {direction} · release Enter to send · Esc cancels",
-                Self::reasoning_effort_label(&snapshot.effort),
-                "=".repeat(filled),
-                "-".repeat(12 - filled),
+            crate::chargesend::status_line(
+                &Self::reasoning_effort_label(&snapshot.effort),
+                snapshot.permille,
+                snapshot.descending,
             )
         });
         self.bottom_pane.set_chargesend_status(status);

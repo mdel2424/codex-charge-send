@@ -25,8 +25,13 @@ python3 scripts/chargesend.py build --tag rust-v0.161.0 --profile dev
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
 checks the entire patch before applying it, and copies `overlays.json` modules.
 `test` uses pinned rustfmt and runs ChargeSend, existing composer, Plan-mode, and
-event-stream tests. `build` repeats those checks before compiling `codex-cli` and
-the matching `codex-code-mode-host` runtime helper from the same pinned source.
+event-stream tests. `build` repeats those checks before compiling `codex-cli`.
+It reuses `codex-code-mode-host` from an installed official package of the exact
+baseline version when available; otherwise it compiles the helper separately
+from the pinned source. The bundle records the helper's origin and checksum.
+Pass `--code-mode-host /path/to/compatible/codex-code-mode-host` to supply one
+explicitly. This avoids the JavaScript engine's separate V8 archive download
+when rebuilding for personal use; Cargo's offline mode does not cache that archive.
 The test runner uses an 8 MiB thread stack, matching upstream's test workflow.
 The standalone patch workflow uses Cargo's lib-test runner with focused filters.
 During local verification, upstream's `just`, nextest, and cargo-insta frontends
@@ -102,6 +107,8 @@ The installer refuses an unmanaged `chargesend` launcher. The uninstaller remove
 only managed launchers and validated bundles, retaining settings and conversations.
 Old versioned bundles remain available until uninstall. Older bundles missing the
 runtime helper or its manifest checksum need rebuilding before installation.
+Reinstall replaces executable files atomically, so an open ChargeSend session
+keeps running. Exit and resume it to load the rebuilt interface.
 
 ## Timing options
 
@@ -109,8 +116,9 @@ Set these environment variables before launching ChargeSend:
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
-| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of each ascent or descent; 250–60000 ms. |
-| `CHARGESEND_TAP_MS` | `150` | Tap always selects the lowest effort; less than half the ascent duration. |
+| `CHARGESEND_DEFAULT_EFFORT` | `xhigh` | Tap and initial charge effort: low, medium, high, xhigh, max. Invalid values use xhigh; unsupported tiers use the nearest supported lower tier. |
+| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of initial default-to-peak rise and each subsequent full ascent or descent; 250–60000 ms. |
+| `CHARGESEND_TAP_MS` | `150` | Tap always selects the configured starting effort; less than half the ascent duration. |
 | `CHARGESEND_FRAME_MS` | `33` | Redraw interval; 10–100 ms. |
 
 For example, in Kitty with the project-local installation:

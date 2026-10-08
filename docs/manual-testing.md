@@ -12,6 +12,9 @@ or SSH verified based on this test.
    observing the label and bar through the peak and descending cycle. Release
    at Low, Medium, and the model's permitted top tier. Check that each prompt
    submits once at the displayed effort.
+   With GPT-6.1 Sol and a default below Max, confirm the peak offers Max and
+   the charge bar excludes Ultra. The Max submission is covered by mock tests;
+   this physical check remains to be run on the rebuilt interface.
 3. Charge then press Escape while still holding Enter. Release and confirm the
    draft and image remain. Repeat with focus loss, thread/model/mode changes,
    an approval or other overlay, and an external-editor transition. Held repeats
@@ -42,3 +45,8 @@ ascent/descent and Escape cancellation followed by Enter release in the compiled
 [kitty-0.45.0-ui.json](kitty-0.45.0-ui.json) records that build's identity.
 Physical submissions, attachment cancellation, other transitions, and the
 remaining checks in steps 2–8 are outstanding.
+
+Default and color checks: with GPT-6.1 Sol, tap Enter and verify Extra High.
+On each fresh hold, verify Extra High and a partially filled orange bar, Max
+at two seconds (red), Low at four seconds (green), then Max again at six.
+Set `CHARGESEND_DEFAULT_EFFORT=high` and repeat to verify the starting tier.

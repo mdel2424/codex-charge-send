@@ -2,8 +2,10 @@
 //! ChargeSend's small input state machine and verified terminal capability.
 //! Upstream-specific glue lives in `chatwidget/chargesend.rs`.
 
+mod bar;
 pub(crate) mod capability;
 mod controller;
+pub(crate) use bar::status_line;
 
 pub(crate) use controller::Controller;
 pub(crate) use controller::Input;

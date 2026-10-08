@@ -1,8 +1,8 @@
 # Patch boundaries
 
-`module/chargesend/controller.rs` owns the monotonic triangle-wave timer,
+`module/chargesend/controller.rs` owns the monotonic timer (default-to-peak first, then a Low–Max triangle wave),
 last-painted effort, and matching-key latch. It accepts eligible context/effort
-choices and produces Pass, Consume, or Submit. It does not know Codex models,
+choices plus the resolved starting effort and produces Pass, Consume, or Submit. It does not know Codex models,
 terminal I/O, backend operations, or configuration. It has standalone Rust tests.
 
 `module/chargesend/capability.rs` requires both Enter-release flag bits and a
@@ -16,7 +16,10 @@ advertised, permitted efforts. It intercepts eligible plain Enter before normal
 dispatch, handles release once, and schedules draws through FrameRequester. A
 synthetic ordinary Enter reuses composer validation, paste expansion, mention
 resolution, and attachment draining. The bar occupies the existing measured
-composer footer; it does not create a separate terminal UI.
+composer footer. `module/chargesend/bar.rs` renders styled spans with a
+green–yellow–red gradient and a label colored by charge position.
+`CHARGESEND_DEFAULT_EFFORT` defaults to xhigh; the model-specific starting
+tier is resolved before charging. Tap and every new press use that tier.
 
 `module/app_chargesend.rs` invalidates charging before overlays and transitions
 can take ownership. Its key latch outlives widget replacement, so a held key from
@@ -58,8 +61,9 @@ Charging starts only in an idle, focused composer with content, no active popup,
 and no pending paste/newline suppression. Slash commands and shell escapes,
 busy steering/queuing, pending image submissions, realtime, input blocking,
 queued follow-ups, and recovery states keep their normal input behavior.
-Only the advanced tier explicitly selected in the active settings is allowed;
-the implementation never infers permission from an advanced model default.
+The personal-use charge range includes Max whenever the active model advertises
+it, without requiring Max as the default. Ultra is excluded even when selected
+in settings. Unsupported tiers are never added to the model's advertised choices.
 
 The patch adds narrow hooks in terminal setup/probing, composer/footer, widget
 construction/input/settings/image submission, and app transitions/draws. The

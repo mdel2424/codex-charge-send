@@ -21,6 +21,7 @@ async fn fixture() -> Fixture {
     let (mut chat, _sender, rx, op_rx) = make_chatwidget_manual_with_sender().await;
     chat.thread_id = Some(ThreadId::new());
     chat.chargesend.terminal_available = true;
+    chat.chargesend.default_effort = ReasoningEffortConfig::Low;
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
     catalog(
         &mut chat,
@@ -377,7 +378,7 @@ async fn chargesend_paste_burst_enter_keeps_newline_suppression() {
 }
 
 #[tokio::test]
-async fn chargesend_model_specific_tiers_and_advanced_opt_in() {
+async fn chargesend_model_specific_tiers_include_max_and_exclude_ultra() {
     let (mut chat, _rx, _op_rx) = fixture().await;
     let custom = ReasoningEffortConfig::Custom("future".to_string());
     catalog(
@@ -392,7 +393,11 @@ async fn chargesend_model_specific_tiers_and_advanced_opt_in() {
     );
     assert_eq!(
         chat.chargesend_choices(),
-        vec![ReasoningEffortConfig::Medium, custom.clone()]
+        vec![
+            ReasoningEffortConfig::Medium,
+            custom.clone(),
+            ReasoningEffortConfig::Max
+        ]
     );
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::Max));
     assert_eq!(
@@ -403,8 +408,42 @@ async fn chargesend_model_specific_tiers_and_advanced_opt_in() {
             ReasoningEffortConfig::Max
         ]
     );
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::Ultra));
+    assert!(
+        !chat
+            .chargesend_choices()
+            .contains(&ReasoningEffortConfig::Ultra)
+    );
     catalog(&mut chat, Vec::new());
     assert!(chat.chargesend_context().is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn chargesend_peak_submits_max_without_changing_default_effort() {
+    let (mut chat, _rx, mut op_rx) = fixture().await;
+    chat.chargesend.default_effort = ReasoningEffortConfig::XHigh;
+    catalog(
+        &mut chat,
+        vec![
+            ReasoningEffortConfig::Low,
+            ReasoningEffortConfig::Medium,
+            ReasoningEffortConfig::High,
+            ReasoningEffortConfig::XHigh,
+            ReasoningEffortConfig::Max,
+            ReasoningEffortConfig::Ultra,
+        ],
+    );
+    let intended = chat.effective_collaboration_mode();
+    enter(&mut chat, KeyEventKind::Press);
+    tokio::time::advance(Duration::from_secs(2)).await;
+    chat.paint_chargesend();
+    enter(&mut chat, KeyEventKind::Release);
+    assert_effort(
+        &next_submit_op(&mut op_rx),
+        ReasoningEffortConfig::Max,
+        ModeKind::Default,
+    );
+    assert_eq!(chat.effective_collaboration_mode(), intended);
 }
 
 #[tokio::test]
@@ -645,4 +684,53 @@ async fn chargesend_pending_images_restore_on_mode_change() {
     assert_no_submit_op(&mut op_rx);
     assert!(chat.bottom_pane.composer_text().contains("keep image"));
     assert_eq!(chat.bottom_pane.composer_local_images().len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn chargesend_xhigh_tap_sends_configured_default_without_persisting() {
+    let (mut chat, _rx, mut op_rx) = fixture().await;
+    catalog(
+        &mut chat,
+        vec![
+            ReasoningEffortConfig::Low,
+            ReasoningEffortConfig::Medium,
+            ReasoningEffortConfig::High,
+            ReasoningEffortConfig::XHigh,
+            ReasoningEffortConfig::Max,
+        ],
+    );
+    chat.chargesend.default_effort = configured_default(None);
+    let intended = chat.effective_collaboration_mode();
+    enter(&mut chat, KeyEventKind::Press);
+    chat.paint_chargesend();
+    tokio::time::advance(Duration::from_millis(100)).await;
+    enter(&mut chat, KeyEventKind::Release);
+    assert_effort(
+        &next_submit_op(&mut op_rx),
+        ReasoningEffortConfig::XHigh,
+        ModeKind::Default,
+    );
+    assert_eq!(chat.effective_collaboration_mode(), intended);
+}
+
+#[test]
+fn chargesend_configured_default_and_supported_fallback() {
+    assert_eq!(configured_default(None), ReasoningEffortConfig::XHigh);
+    assert_eq!(configured_default(Some("max")), ReasoningEffortConfig::Max);
+    assert_eq!(configured_default(Some("low")), ReasoningEffortConfig::Low);
+    assert_eq!(
+        configured_default(Some("invalid")),
+        ReasoningEffortConfig::XHigh
+    );
+    assert_eq!(
+        starting_effort(
+            &[
+                ReasoningEffortConfig::Low,
+                ReasoningEffortConfig::High,
+                ReasoningEffortConfig::Max
+            ],
+            &ReasoningEffortConfig::XHigh
+        ),
+        ReasoningEffortConfig::High
+    );
 }

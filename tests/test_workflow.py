@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -86,7 +87,7 @@ class PatchWorkflowTests(unittest.TestCase):
                 return ""
             return original_run(args, cwd=cwd, capture=capture)
 
-        with mock.patch.object(workflow, "run", side_effect=compile_and_edit):
+        with mock.patch.object(workflow, "run", side_effect=compile_and_edit), mock.patch.object(workflow, "installed_code_mode_host", return_value=None):
             with self.assertRaisesRegex(workflow.Failure, "different ChargeSend patch"):
                 workflow.bundle(self.source, "fixture", "dev")
 
@@ -227,6 +228,33 @@ class InstallationTests(unittest.TestCase):
         workflow.uninstall(self.args)
         self.assertFalse((self.prefix / "bin/codex").is_symlink())
 
+    def test_reinstall_replaces_a_running_binary_without_stopping_it(self):
+        binary = self.bundle / "chargesend-cli"
+        shutil.copy2("/bin/bash", binary)
+        manifest = self.bundle / "manifest.json"
+        metadata = json.loads(manifest.read_text())
+        metadata["binary_sha256"] = workflow.sha256(binary)
+        manifest.write_text(json.dumps(metadata))
+        workflow.install(self.args)
+        installed = self.prefix / "lib/chargesend" / self.bundle.name / "chargesend-cli"
+        running = subprocess.Popen(
+            [installed, "-c", "printf 'ready\\n'; read line"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+        )
+        try:
+            self.assertEqual(running.stdout.readline(), "ready\n")
+            binary.write_text("#!/bin/sh\nprintf 'updated\\n'\n")
+            metadata["binary_sha256"] = workflow.sha256(binary)
+            manifest.write_text(json.dumps(metadata))
+            workflow.install(self.args)
+            self.assertIsNone(running.poll())
+            self.assertEqual(subprocess.check_output([installed], text=True), "updated\n")
+        finally:
+            running.terminate()
+            running.wait(timeout=5)
+            running.stdin.close()
+            running.stdout.close()
+
     def test_symlink_command_is_not_followed(self):
         target = self.directory / "unrelated"
         target.write_text("keep")
@@ -249,17 +277,39 @@ class BundleTests(unittest.TestCase):
             binaries.mkdir(parents=True)
             (binaries / "codex").write_text("CLI fixture")
             (binaries / "codex-code-mode-host").write_text("helper fixture")
+            (binaries / "codex-code-mode-host").chmod(0o755)
             for name in ["LICENSE", "NOTICE", "UPSTREAM-NOTICE"]:
                 (root / name).write_text("notice fixture")
             def fake_run(args, cwd=None, capture=False):
                 return "host: test-target" if args == ["rustc", "-vV"] else "rustc fixture" if args == ["rustc", "--version"] else ""
-            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
+            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "installed_code_mode_host", return_value=None), mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
                 destination = workflow.bundle(source, "rust-v0.161.0", "dev")
             self.assertEqual((destination / "codex-code-mode-host").read_text(), "helper fixture")
             self.assertTrue(os.access(destination / "codex-code-mode-host", os.X_OK))
             self.assertEqual(workflow.validated_bundle(destination)["code_mode_host_sha256"], workflow.sha256(destination / "codex-code-mode-host"))
-            build = run.call_args_list[0].args[0]
-            self.assertIn("codex-code-mode-host", build)
+            builds = [call.args[0] for call in run.call_args_list if call.args[0][:2] == ["cargo", "build"]]
+            self.assertEqual(len(builds), 2)
+            self.assertIn("codex-code-mode-host", builds[1])
+            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
+                workflow.bundle(source, "rust-v0.161.0", "dev", binaries / "codex-code-mode-host")
+            builds = [call.args[0] for call in run.call_args_list if call.args[0][:2] == ["cargo", "build"]]
+            self.assertEqual(len(builds), 1, "prebuilt helper avoids compiling the JavaScript engine")
+
+    def test_installed_helper_requires_exact_package_version(self):
+        with tempfile.TemporaryDirectory(prefix="chargesend-helper-") as directory:
+            home = Path(directory)
+            binaries = home / ".codex/packages/standalone/releases/0.161.0-test/bin"
+            binaries.mkdir(parents=True)
+            helper = binaries / "codex-code-mode-host"
+            helper.write_text("#!/bin/sh\nexit 0\n")
+            helper.chmod(0o755)
+            cli = binaries / "codex"
+            cli.write_text("#!/bin/sh\nprintf 'codex-cli 0.162.0\\n'\n")
+            cli.chmod(0o755)
+            with mock.patch.object(workflow.Path, "home", return_value=home):
+                self.assertIsNone(workflow.installed_code_mode_host("rust-v0.161.0"))
+                cli.write_text("#!/bin/sh\nprintf 'codex-cli 0.161.0\\n'\n")
+                self.assertEqual(workflow.installed_code_mode_host("rust-v0.161.0"), helper.resolve())
 
 
 if __name__ == "__main__":

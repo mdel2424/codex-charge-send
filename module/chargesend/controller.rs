@@ -73,6 +73,7 @@ struct Charge<C, E> {
     context: C,
     choices: Vec<E>,
     painted: E,
+    start_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -108,10 +109,12 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
     }
 
     /// Invalidate on changes to model, thread, settings, choices, or eligibility.
-    pub(crate) fn validate(&mut self, eligible: Option<&(C, Vec<E>)>) {
+    pub(crate) fn validate(&mut self, eligible: Option<&(C, Vec<E>, E)>) {
         if self.active.as_ref().is_some_and(|active| {
-            eligible.is_none_or(|(context, choices)| {
-                active.context != *context || active.choices != *choices
+            eligible.is_none_or(|(context, choices, default)| {
+                active.context != *context
+                    || active.choices != *choices
+                    || active.choices[active.start_index] != *default
             })
         }) {
             self.cancel();
@@ -121,7 +124,7 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
     pub(crate) fn handle(
         &mut self,
         input: Input,
-        eligible: Option<(C, Vec<E>)>,
+        eligible: Option<(C, Vec<E>, E)>,
         now: Instant,
     ) -> Outcome<E> {
         self.validate(eligible.as_ref());
@@ -129,10 +132,10 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
             Input::EnterRelease if self.enter_down => {
                 self.enter_down = false;
                 self.active.take().map_or(Outcome::Consume, |charge| {
-                    // A short tap always selects the lowest allowed effort.
+                    // A short tap always selects the configured starting effort.
                     let effort = if now.saturating_duration_since(charge.started) <= self.timing.tap
                     {
-                        charge.choices[0].clone()
+                        charge.choices[charge.start_index].clone()
                     } else {
                         charge.painted
                     };
@@ -142,16 +145,22 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
             Input::EnterPress | Input::EnterRepeat if self.enter_down => Outcome::Consume,
             Input::EnterRepeat if eligible.is_some() => Outcome::Consume,
             Input::EnterPress => {
-                let Some((context, choices)) = eligible.filter(|(_, choices)| !choices.is_empty())
+                let Some((context, choices, default)) =
+                    eligible.filter(|(_, choices, _)| !choices.is_empty())
                 else {
                     return Outcome::Pass;
                 };
-                let painted = choices[0].clone();
+                let start_index = choices
+                    .iter()
+                    .position(|effort| *effort == default)
+                    .unwrap_or(0);
+                let painted = choices[start_index].clone();
                 self.active = Some(Charge {
                     started: now,
                     context,
                     choices,
                     painted,
+                    start_index,
                 });
                 self.enter_down = true;
                 Outcome::Consume
@@ -173,21 +182,33 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
         let charge = self.active.as_mut()?;
         let half = self.timing.half_cycle.as_nanos();
         let elapsed = now.saturating_duration_since(charge.started).as_nanos();
-        let phase = elapsed % (half * 2);
-        let descending = phase >= half;
-        let rising = if descending { half * 2 - phase } else { phase };
-        let index = if rising <= self.timing.tap.as_nanos() {
-            0
+        let max_index = (charge.choices.len() - 1) as u128;
+        let (position, descending) = if elapsed < half {
+            let start = charge.start_index as u128;
+            let rise = if elapsed <= self.timing.tap.as_nanos() {
+                0
+            } else {
+                elapsed
+            };
+            (start * half + (max_index - start) * rise, false)
         } else {
-            // Round to the closest advertised tier. The endpoints have a usable
-            // dwell interval; the bar itself reaches full at exactly half_cycle.
-            ((rising * (charge.choices.len() - 1) as u128 + half / 2) / half) as usize
+            let phase = (elapsed - half) % (half * 2);
+            if phase < half {
+                (max_index * (half - phase), true)
+            } else {
+                (max_index * (phase - half), false)
+            }
         };
+        let index = ((position + half / 2) / half) as usize;
         let effort = charge.choices[index].clone();
         charge.painted = effort.clone();
         Some(Snapshot {
             effort,
-            permille: (rising * 1000 / half) as u16,
+            permille: if max_index == 0 {
+                1000
+            } else {
+                (position * 1000 / (max_index * half)) as u16
+            },
             descending,
         })
     }

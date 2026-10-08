@@ -20,6 +20,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,13 +216,35 @@ def write_launcher(destination: Path, version: str, tag: str) -> None:
     destination.chmod(0o755)
 
 
-def bundle(source: Path, tag: str, profile: str) -> Path:
+def installed_code_mode_host(tag: str) -> Path | None:
+    """Reuse the helper from an installed official package of this exact version."""
+    version = tag.removeprefix("rust-v")
+    for product in ["standalone", "app-server-daemon"]:
+        releases = Path.home() / ".codex/packages" / product / "releases"
+        for helper in sorted(releases.glob(f"{version}-*/bin/codex-code-mode-host")):
+            if not helper.is_file() or not os.access(helper, os.X_OK):
+                continue
+            try:
+                actual = run([str(helper.parent / "codex"), "--version"], capture=True)
+            except Failure:
+                continue
+            if actual == f"codex-cli {version}":
+                return helper.resolve()
+    return None
+
+
+def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = None) -> Path:
     cargo_manifest = tomllib.loads((source / "codex-rs/cli/Cargo.toml").read_text())
     package_name = cargo_manifest["package"]["name"]
     if not any(binary.get("name") == "codex" for binary in cargo_manifest.get("bin", [])):
         raise Failure("Upstream CLI binary layout changed. Inspect cli/Cargo.toml before porting.")
     workspace = source / "codex-rs"
-    run(["cargo", "build", "--locked", "-p", package_name, "-p", "codex-code-mode-host", "--bin", "codex", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace)
+    helper = code_mode_host or installed_code_mode_host(tag)
+    if helper is not None and (not helper.is_file() or not os.access(helper, os.X_OK)):
+        raise Failure(f"{helper} is not an executable code-mode runtime helper.")
+    run(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
+    if helper is None:
+        run(["cargo", "build", "--locked", "-p", "codex-code-mode-host", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace)
     # Refuse a misleading manifest if patch inputs or prepared source changed
     # while the compiler was running.
     apply_to(source, tag)
@@ -235,9 +258,10 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
     binary = target_directory / ("debug" if profile == "dev" else profile) / "codex"
     shutil.copyfile(binary, destination / "chargesend-cli")
     (destination / "chargesend-cli").chmod(0o755)
-    helper = binary.parent / "codex-code-mode-host"
-    shutil.copyfile(helper, destination / helper.name)
-    (destination / helper.name).chmod(0o755)
+    helper_origin = f"prebuilt helper: {helper}" if helper else "compiled from pinned upstream source"
+    helper = helper or binary.parent / "codex-code-mode-host"
+    shutil.copyfile(helper, destination / "codex-code-mode-host")
+    (destination / "codex-code-mode-host").chmod(0o755)
     for notice in ["LICENSE", "NOTICE", "UPSTREAM-NOTICE"]:
         shutil.copyfile(ROOT / notice, destination / notice)
     write_launcher(destination / "bin/chargesend", VERSION, tag)
@@ -251,6 +275,7 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
         "lock_adjustment": "only inherited local workspace package versions aligned; third-party pins unchanged",
         "binary_sha256": sha256(destination / "chargesend-cli"),
         "code_mode_host_sha256": sha256(destination / "codex-code-mode-host"),
+        "code_mode_host_origin": helper_origin,
         "checks": "ChargeSend, composer, Plan-mode, and event-stream Rust tests passed",
         "physical_keyboard_check": "not performed by build script",
     }
@@ -263,7 +288,8 @@ def build(args: argparse.Namespace) -> None:
     prerequisites(args.tag)
     source = prepare(args)
     test_source(source)
-    bundle(source, args.tag, args.profile)
+    helper = Path(args.code_mode_host).expanduser().resolve() if args.code_mode_host else None
+    bundle(source, args.tag, args.profile, helper)
 
 
 def validated_bundle(path: Path) -> dict:
@@ -334,6 +360,19 @@ def restore_codex(args: argparse.Namespace) -> None:
         print(f"Removed {command} mapping; no original executable was saved at this prefix.")
 
 
+def replace_installed_file(source: str, destination: str) -> str:
+    """Replace files atomically so a running CLI can keep its old executable."""
+    destination = Path(destination)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+    os.close(descriptor)
+    try:
+        shutil.copy2(source, temporary)
+        os.replace(temporary, destination)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return str(destination)
+
+
 def install(args: argparse.Namespace) -> None:
     source = Path(args.bundle).expanduser().resolve()
     validated_bundle(source)
@@ -344,7 +383,7 @@ def install(args: argparse.Namespace) -> None:
     destination = prefix / "lib/chargesend" / source.name
     if destination.exists():
         validated_bundle(destination)
-    shutil.copytree(source, destination, dirs_exist_ok=True)
+    shutil.copytree(source, destination, dirs_exist_ok=True, copy_function=replace_installed_file)
     command.parent.mkdir(parents=True, exist_ok=True)
     command.write_text("#!/bin/sh\n" + MARKER + "\n" + f"exec {shlex.quote(str(destination / 'bin/chargesend'))} \"$@\"\n")
     command.chmod(0o755)
@@ -386,6 +425,7 @@ def main() -> int:
         sub.add_argument("--source", help="full clean checkout at the pinned release commit")
         if name == "build":
             sub.add_argument("--profile", choices=["dev", "release"], default="dev")
+            sub.add_argument("--code-mode-host", help="reuse an existing compatible runtime helper instead of compiling its JavaScript engine")
     sub = subparsers.add_parser("install")
     sub.add_argument("--bundle", required=True)
     sub.add_argument("--prefix", default=str(Path.home() / ".local"))

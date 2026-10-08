@@ -28,8 +28,8 @@ Wait until the agent is idle, then type your prompt:
 
 | Action | Result |
 | --- | --- |
-| Tap Enter | Send at the lowest allowed effort. |
-| Hold Enter | Watch the effort bar rise for two seconds, descend for two seconds, and repeat. |
+| Tap Enter | Send at the configured starting effort (Extra High by default). |
+| Hold Enter | Start at Extra High, rise to Max over two seconds, then descend to Low and repeat Low–Max. |
 | Release Enter | Send once using the displayed effort. |
 | Press Escape while holding | Cancel and keep the draft and attachments. Release Enter before trying again. |
 
@@ -84,8 +84,8 @@ are unavailable, Enter sends normally and the UI shows an unavailable notice.
 
 | Codex baseline | Automated verification |
 | --- | --- |
-| 0.161.0 | Native CLI built; 495 Rust tests passed. |
-| 0.160.0 | Native CLI built; 486 Rust tests passed; physical UI check pending. |
+| 0.161.0 | Native CLI built; 500 Rust tests passed. |
+| 0.160.0 | Native CLI built; 491 Rust tests passed; physical UI check pending. |
 
 The [verification record](docs/verification.md) distinguishes automated results
 from physical checks. The full [manual checklist](docs/manual-testing.md) still
@@ -93,12 +93,19 @@ needs completion, including release-to-submit in the actual UI.
 
 ## Settings and limits
 
-Effort choices come from the active model. Max and Ultra require that exact tier
-to be explicitly selected in the active settings. The charge applies to the
+The bar uses the active model's supported efforts through Max, including Max
+without first selecting it in settings. Ultra is excluded from the charge bar.
+For GPT-6.1 Sol, a tap sends Extra High. Hold to the peak to send at Max.
+The colored bar runs from green at Low through yellow to red at Max. The charge applies to the
 submitted request, including Plan mode, without writing to `config.toml`.
 Later submissions explicitly use their intended effort. The backend can retain
 the charged thread setting until the next submission; restart/resume and
 multiple-client behavior need further testing.
+
+Set `CHARGESEND_DEFAULT_EFFORT=xhigh` to choose the tap and initial charge
+effort (`low`, `medium`, `high`, `xhigh`, or `max`). Unsupported defaults use
+the closest supported lower tier, or the first advertised tier. Each new press
+starts at this default.
 
 Set `CHARGESEND_HALF_CYCLE_MS=1000` for a one-second ascent and descent, or
 `CHARGESEND_DISABLE=1` for ordinary Enter submission. See the
