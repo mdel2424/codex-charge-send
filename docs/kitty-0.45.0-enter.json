@@ -1,0 +1,24 @@
+{
+  "time_utc": "2026-10-08T21:27:06.538383+00:00",
+  "terminal": "kitty 0.45.0 created by Kovid Goyal",
+  "term": "xterm-kitty",
+  "negotiated_flags": 15,
+  "holds_ms": [
+    88,
+    3536
+  ],
+  "passed": true,
+  "scope": "physical Enter protocol; no composer/backend verification",
+  "observed_events": {
+    "1": 2,
+    "3": 2,
+    "2": 101
+  },
+  "event_kinds": {
+    "1": "press",
+    "2": "repeat",
+    "3": "release"
+  },
+  "raw_report_sha256": "da5998f52a3462191b98145f928e70670bc5b72f6b510389bfe45f9ab9db2504",
+  "performed_by": "User, physical keyboard in direct Kitty on Ubuntu 26.04"
+}

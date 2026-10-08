@@ -1,0 +1,17 @@
+{
+  "default": "rust-v0.161.0",
+  "upstream": "https://github.com/openai/codex.git",
+  "releases": {
+    "rust-v0.161.0": {
+      "commit": "979011409de0a60b52f179721948e65531d26144",
+      "rust": "1.95.0",
+      "status": "patch applies to full pinned release; compilation and keyboard verification pending"
+    },
+    "rust-v0.160.0": {
+      "commit": "a956835d020762cb2b570053af06f643a11c0ecc",
+      "rust": "1.95.0",
+      "patch": "patches/chargesend-0.160.0.patch",
+      "status": "versioned patch applies to full pinned release; compilation and keyboard verification pending"
+    }
+  }
+}

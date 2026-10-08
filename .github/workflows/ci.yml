@@ -1,0 +1,55 @@
+name: ChargeSend checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: python3 -m unittest discover -s tests -v
+      - run: bash -n scripts/build.sh scripts/setup-ubuntu.sh scripts/fetch-upstream.sh
+
+  upstream:
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [rust-v0.161.0, rust-v0.160.0]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: "0"
+      RUST_BACKTRACE: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libssl-dev libcap-dev libclang-dev libasound2-dev libudev-dev libdbus-1-dev
+      - name: Pinned Rust
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --component rust-src
+      - name: Fetch, check patch, run focused and regression tests, compile CLI
+        run: python3 scripts/chargesend.py build --tag '${{ matrix.tag }}'
+      - name: Verify independent launcher
+        run: |
+          bundles=(dist/chargesend-*)
+          bundle=${bundles[0]}
+          "$bundle/bin/chargesend" --version
+          "$bundle/bin/chargesend" --help
+          python3 scripts/chargesend.py install --bundle "$bundle" --prefix "$RUNNER_TEMP/chargesend-install"
+          "$RUNNER_TEMP/chargesend-install/bin/chargesend" --version
+          python3 scripts/chargesend.py uninstall --prefix "$RUNNER_TEMP/chargesend-install"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chargesend-${{ matrix.tag }}
+          path: dist/
+          if-no-files-found: error
