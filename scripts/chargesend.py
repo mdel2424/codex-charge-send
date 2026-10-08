@@ -221,7 +221,7 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
     if not any(binary.get("name") == "codex" for binary in cargo_manifest.get("bin", [])):
         raise Failure("Upstream CLI binary layout changed. Inspect cli/Cargo.toml before porting.")
     workspace = source / "codex-rs"
-    run(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
+    run(["cargo", "build", "--locked", "-p", package_name, "-p", "codex-code-mode-host", "--bin", "codex", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace)
     # Refuse a misleading manifest if patch inputs or prepared source changed
     # while the compiler was running.
     apply_to(source, tag)
@@ -235,6 +235,9 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
     binary = target_directory / ("debug" if profile == "dev" else profile) / "codex"
     shutil.copyfile(binary, destination / "chargesend-cli")
     (destination / "chargesend-cli").chmod(0o755)
+    helper = binary.parent / "codex-code-mode-host"
+    shutil.copyfile(helper, destination / helper.name)
+    (destination / helper.name).chmod(0o755)
     for notice in ["LICENSE", "NOTICE", "UPSTREAM-NOTICE"]:
         shutil.copyfile(ROOT / notice, destination / notice)
     write_launcher(destination / "bin/chargesend", VERSION, tag)
@@ -247,6 +250,7 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
         "upstream_cargo_lock_sha256": hashlib.sha256(subprocess.check_output(["git", "show", "HEAD:codex-rs/Cargo.lock"], cwd=source)).hexdigest(),
         "lock_adjustment": "only inherited local workspace package versions aligned; third-party pins unchanged",
         "binary_sha256": sha256(destination / "chargesend-cli"),
+        "code_mode_host_sha256": sha256(destination / "codex-code-mode-host"),
         "checks": "ChargeSend, composer, Plan-mode, and event-stream Rust tests passed",
         "physical_keyboard_check": "not performed by build script",
     }
@@ -267,9 +271,67 @@ def validated_bundle(path: Path) -> dict:
         metadata = json.loads((path / "manifest.json").read_text())
         if metadata["product"] != "ChargeSend" or metadata["binary_sha256"] != sha256(path / "chargesend-cli"):
             raise Failure("Bundle product or binary checksum does not match its manifest.")
+        if metadata["code_mode_host_sha256"] != sha256(path / "codex-code-mode-host"):
+            raise Failure("Bundle runtime helper checksum does not match its manifest.")
         return metadata
     except (OSError, KeyError, ValueError) as error:
         raise Failure(f"{path} is not a completed ChargeSend build bundle.") from error
+
+
+def managed_launcher(path: Path) -> bool:
+    return path.is_file() and MARKER.encode() in path.read_bytes()[:256]
+
+
+def link_codex(args: argparse.Namespace) -> None:
+    prefix = Path(args.prefix).expanduser().resolve()
+    launcher = Path(args.launcher).expanduser().absolute() if args.launcher else prefix / "bin/chargesend"
+    if not managed_launcher(launcher) or not os.access(launcher, os.X_OK):
+        raise Failure(f"{launcher} is not an executable ChargeSend launcher. Install ChargeSend first.")
+    command = prefix / "bin/codex"
+    stock = prefix / "bin/codex-stock"
+    if command.is_symlink() and command.resolve() == launcher.resolve():
+        print(f"{command} already launches ChargeSend.")
+        return
+    already_mapped = command.is_symlink() and managed_launcher(command)
+    if command.exists() or command.is_symlink():
+        if not command.is_file():
+            raise Failure(f"{command} is not a working executable file; refusing to replace it.")
+        if not already_mapped and (stock.exists() or stock.is_symlink()):
+            raise Failure(f"{stock} already exists; refusing to overwrite your saved Codex.")
+    command.parent.mkdir(parents=True, exist_ok=True)
+    temporary = command.with_name(".codex-chargesend-link.tmp")
+    if temporary.exists() or temporary.is_symlink():
+        raise Failure(f"{temporary} already exists; refusing to overwrite it.")
+    temporary.symlink_to(launcher)
+    saved_original = False
+    try:
+        if not already_mapped and (command.exists() or command.is_symlink()):
+            command.rename(stock)
+            saved_original = True
+        try:
+            temporary.replace(command)
+        except OSError:
+            if saved_original:
+                stock.rename(command)
+            raise
+    finally:
+        if temporary.is_symlink():
+            temporary.unlink()
+    print(f"{command} now launches ChargeSend. Original Codex: {stock}.")
+
+
+def restore_codex(args: argparse.Namespace) -> None:
+    prefix = Path(args.prefix).expanduser().resolve()
+    command = prefix / "bin/codex"
+    stock = prefix / "bin/codex-stock"
+    if not command.is_symlink() or not managed_launcher(command):
+        raise Failure(f"{command} is not a ChargeSend mapping; refusing to change it.")
+    if stock.exists() or stock.is_symlink():
+        stock.replace(command)
+        print(f"Restored {command} to stock Codex.")
+    else:
+        command.unlink()
+        print(f"Removed {command} mapping; no original executable was saved at this prefix.")
 
 
 def install(args: argparse.Namespace) -> None:
@@ -286,12 +348,17 @@ def install(args: argparse.Namespace) -> None:
     command.parent.mkdir(parents=True, exist_ok=True)
     command.write_text("#!/bin/sh\n" + MARKER + "\n" + f"exec {shlex.quote(str(destination / 'bin/chargesend'))} \"$@\"\n")
     command.chmod(0o755)
-    print(f"Installed {command}. Stock codex and its configuration were not changed.")
+    print(f"Installed {command}.")
+    if getattr(args, "as_codex", False):
+        link_codex(argparse.Namespace(prefix=str(prefix), launcher=str(command)))
 
 
 def uninstall(args: argparse.Namespace) -> None:
     prefix = Path(args.prefix).expanduser().resolve()
     command = prefix / "bin/chargesend"
+    codex = prefix / "bin/codex"
+    if codex.is_symlink() and codex.resolve() == command.resolve():
+        restore_codex(args)
     if command.exists() or command.is_symlink():
         if command.is_symlink() or not command.is_file() or MARKER.encode() not in command.read_bytes()[:256]:
             raise Failure(f"Refusing to remove unmanaged {command}.")
@@ -322,6 +389,12 @@ def main() -> int:
     sub = subparsers.add_parser("install")
     sub.add_argument("--bundle", required=True)
     sub.add_argument("--prefix", default=str(Path.home() / ".local"))
+    sub.add_argument("--as-codex", action="store_true", help="make codex launch ChargeSend, preserving the original as codex-stock")
+    sub = subparsers.add_parser("link-codex", help="make codex launch an installed or project-local ChargeSend")
+    sub.add_argument("--prefix", default=str(Path.home() / ".local"))
+    sub.add_argument("--launcher", help="ChargeSend launcher; defaults to <prefix>/bin/chargesend")
+    sub = subparsers.add_parser("restore-codex", help="restore the original codex command")
+    sub.add_argument("--prefix", default=str(Path.home() / ".local"))
     sub = subparsers.add_parser("uninstall")
     sub.add_argument("--prefix", default=str(Path.home() / ".local"))
     args = parser.parse_args()
@@ -335,6 +408,10 @@ def main() -> int:
             build(args)
         elif args.command == "install":
             install(args)
+        elif args.command == "link-codex":
+            link_codex(args)
+        elif args.command == "restore-codex":
+            restore_codex(args)
         else:
             uninstall(args)
     except (Failure, OSError) as error:

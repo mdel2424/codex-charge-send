@@ -49,8 +49,10 @@ jobs:
           bundle=${bundles[0]}
           "$bundle/bin/chargesend" --version
           "$bundle/bin/chargesend" --help
-          python3 scripts/chargesend.py install --bundle "$bundle" --prefix "$RUNNER_TEMP/chargesend-install"
+          "$bundle/codex-code-mode-host" --help
+          python3 scripts/chargesend.py install --bundle "$bundle" --prefix "$RUNNER_TEMP/chargesend-install" --as-codex
           "$RUNNER_TEMP/chargesend-install/bin/chargesend" --version
+          "$RUNNER_TEMP/chargesend-install/bin/codex" --version
           python3 scripts/chargesend.py uninstall --prefix "$RUNNER_TEMP/chargesend-install"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

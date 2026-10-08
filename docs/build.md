@@ -25,7 +25,8 @@ python3 scripts/chargesend.py build --tag rust-v0.161.0 --profile dev
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
 checks the entire patch before applying it, and copies `overlays.json` modules.
 `test` uses pinned rustfmt and runs ChargeSend, existing composer, Plan-mode, and
-event-stream tests. `build` repeats those checks before compiling `codex-cli`.
+event-stream tests. `build` repeats those checks before compiling `codex-cli` and
+the matching `codex-code-mode-host` runtime helper from the same pinned source.
 The test runner uses an 8 MiB thread stack, matching upstream's test workflow.
 The standalone patch workflow uses Cargo's lib-test runner with focused filters.
 During local verification, upstream's `just`, nextest, and cargo-insta frontends
@@ -71,18 +72,36 @@ reports one, obtain that exact artifact in your normal terminal as well.
 Each bundle name includes ChargeSend version, Codex release, host triple, and
 profile. Its `manifest.json` contains the upstream commit, patch/module
 fingerprint, Rust version, original and adjusted lock checksums, binary checksum, automated
-checks, and a separate physical keyboard status. The `chargesend-cli` file is the
+checks, the runtime helper checksum, and a separate physical keyboard status. The `chargesend-cli` file is the
 actual compiled native binary. `bin/chargesend` forwards arguments unchanged,
 except for its single-argument version reporting.
 
 ```bash
-python3 scripts/chargesend.py install --bundle /absolute/path/to/bundle --prefix "$HOME/.local"
+python3 scripts/chargesend.py install --bundle /absolute/path/to/bundle --prefix "$HOME/.local" --as-codex
+codex --version
+codex-stock --version
+python3 scripts/chargesend.py restore-codex --prefix "$HOME/.local"
 python3 scripts/chargesend.py uninstall --prefix "$HOME/.local"
 ```
 
-The installer refuses an existing unmanaged command. The uninstaller removes
-only managed ChargeSend launchers and validated bundles. Stock `codex` and user
-data are retained. Old versioned bundles remain available until uninstall.
+`--as-codex` saves the existing command as `codex-stock` and links `codex` to the
+installed ChargeSend launcher. Arguments are forwarded unchanged. Repeating the
+same mapping is safe; an existing conflicting backup is never overwritten.
+Uninstall restores the original command when its `codex` points to this install.
+Omit `--as-codex` to leave the `codex` command alone.
+
+For a project-local install, map the launcher without copying the bundle again:
+
+```bash
+python3 scripts/chargesend.py link-codex --launcher "$PWD/local/bin/chargesend"
+```
+
+This maps `~/.local/bin/codex`; `restore-codex` reverses it. Restore this mapping
+before uninstalling the project-local bundle. Keep `~/.local/bin` first on PATH.
+The installer refuses an unmanaged `chargesend` launcher. The uninstaller removes
+only managed launchers and validated bundles, retaining settings and conversations.
+Old versioned bundles remain available until uninstall. Older bundles missing the
+runtime helper or its manifest checksum need rebuilding before installation.
 
 ## Timing options
 
@@ -97,7 +116,7 @@ Set these environment variables before launching ChargeSend:
 For example, in Kitty with the project-local installation:
 
 ```bash
-CHARGESEND_HALF_CYCLE_MS=1000 ./local/bin/chargesend --no-daemon
+CHARGESEND_HALF_CYCLE_MS=1000 codex
 ```
 
 Invalid timing values log a warning and use all defaults. A monotonic clock

@@ -125,7 +125,10 @@ class InstallationTests(unittest.TestCase):
         binary.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
         binary.chmod(0o755)
         workflow.write_launcher(self.bundle / "bin/chargesend", "0.1.0", "rust-v0.161.0")
-        (self.bundle / "manifest.json").write_text(json.dumps({"product": "ChargeSend", "binary_sha256": workflow.sha256(binary)}))
+        helper = self.bundle / "codex-code-mode-host"
+        helper.write_text("#!/bin/sh\nexit 0\n")
+        helper.chmod(0o755)
+        (self.bundle / "manifest.json").write_text(json.dumps({"product": "ChargeSend", "binary_sha256": workflow.sha256(binary), "code_mode_host_sha256": workflow.sha256(helper)}))
         self.prefix = self.directory / "prefix with spaces"
         (self.prefix / "bin").mkdir(parents=True)
         (self.prefix / "bin/codex").write_text("stock Codex")
@@ -156,6 +159,74 @@ class InstallationTests(unittest.TestCase):
         with self.assertRaisesRegex(workflow.Failure, "checksum"):
             workflow.install(self.args)
 
+    def test_runtime_helper_is_required_and_verified(self):
+        helper = self.bundle / "codex-code-mode-host"
+        helper.write_text("changed")
+        with self.assertRaisesRegex(workflow.Failure, "helper checksum"):
+            workflow.install(self.args)
+        helper.unlink()
+        with self.assertRaisesRegex(workflow.Failure, "completed ChargeSend"):
+            workflow.install(self.args)
+
+    def test_codex_mapping_forwards_arguments_is_repeatable_and_restores_on_uninstall(self):
+        self.args.as_codex = True
+        workflow.install(self.args)
+        command = self.prefix / "bin/codex"
+        stock = self.prefix / "bin/codex-stock"
+        self.assertTrue(command.is_symlink())
+        self.assertEqual(stock.read_text(), "stock Codex")
+        arguments = ["resume", "session with spaces", "--no-daemon"]
+        self.assertEqual(subprocess.check_output([command, *arguments], text=True).splitlines(), arguments)
+        workflow.install(self.args)
+        self.assertEqual(stock.read_text(), "stock Codex")
+        workflow.uninstall(self.args)
+        self.assertFalse(command.is_symlink())
+        self.assertEqual(command.read_text(), "stock Codex")
+        self.assertFalse(stock.exists())
+
+    def test_project_local_mapping_preserves_relative_stock_symlink(self):
+        workflow.install(self.args)
+        command = self.prefix / "bin/codex"
+        command.unlink()
+        original = self.prefix / "bin/original-codex"
+        original.write_text("stock Codex")
+        command.symlink_to("original-codex")
+        args = argparse.Namespace(prefix=str(self.prefix), launcher=str(self.bundle / "bin/chargesend"))
+        workflow.link_codex(args)
+        workflow.link_codex(args)
+        self.assertEqual(os.readlink(self.prefix / "bin/codex-stock"), "original-codex")
+        workflow.restore_codex(args)
+        self.assertEqual(os.readlink(command), "original-codex")
+
+    def test_mapping_and_restoration_refuse_conflicts(self):
+        workflow.install(self.args)
+        stock = self.prefix / "bin/codex-stock"
+        stock.write_text("existing backup")
+        args = argparse.Namespace(prefix=str(self.prefix), launcher=None)
+        with self.assertRaisesRegex(workflow.Failure, "saved Codex"):
+            workflow.link_codex(args)
+        self.assertEqual((self.prefix / "bin/codex").read_text(), "stock Codex")
+        self.assertEqual(stock.read_text(), "existing backup")
+        with self.assertRaisesRegex(workflow.Failure, "not a ChargeSend mapping"):
+            workflow.restore_codex(args)
+
+    def test_switching_from_project_launcher_to_install_keeps_original_backup(self):
+        workflow.install(self.args)
+        workflow.link_codex(argparse.Namespace(prefix=str(self.prefix), launcher=str(self.bundle / "bin/chargesend")))
+        self.args.as_codex = True
+        workflow.install(self.args)
+        self.assertEqual((self.prefix / "bin/codex").resolve(), (self.prefix / "bin/chargesend").resolve())
+        self.assertEqual((self.prefix / "bin/codex-stock").read_text(), "stock Codex")
+        workflow.uninstall(self.args)
+        self.assertEqual((self.prefix / "bin/codex").read_text(), "stock Codex")
+
+    def test_mapping_without_stock_is_removed_on_uninstall(self):
+        (self.prefix / "bin/codex").unlink()
+        self.args.as_codex = True
+        workflow.install(self.args)
+        workflow.uninstall(self.args)
+        self.assertFalse((self.prefix / "bin/codex").is_symlink())
+
     def test_symlink_command_is_not_followed(self):
         target = self.directory / "unrelated"
         target.write_text("keep")
@@ -163,6 +234,32 @@ class InstallationTests(unittest.TestCase):
         with self.assertRaises(workflow.Failure):
             workflow.install(self.args)
         self.assertEqual(target.read_text(), "keep")
+
+
+class BundleTests(unittest.TestCase):
+    def test_bundle_copies_runtime_helper_and_records_checksum(self):
+        with tempfile.TemporaryDirectory(prefix="chargesend-bundle-") as directory:
+            root = Path(directory)
+            source = root / "upstream"
+            workspace = source / "codex-rs"
+            (workspace / "cli").mkdir(parents=True)
+            (workspace / "cli/Cargo.toml").write_text('[package]\nname = "codex-cli"\n[[bin]]\nname = "codex"\n')
+            (workspace / "Cargo.lock").write_text("version = 4\n")
+            binaries = workspace / "target/debug"
+            binaries.mkdir(parents=True)
+            (binaries / "codex").write_text("CLI fixture")
+            (binaries / "codex-code-mode-host").write_text("helper fixture")
+            for name in ["LICENSE", "NOTICE", "UPSTREAM-NOTICE"]:
+                (root / name).write_text("notice fixture")
+            def fake_run(args, cwd=None, capture=False):
+                return "host: test-target" if args == ["rustc", "-vV"] else "rustc fixture" if args == ["rustc", "--version"] else ""
+            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
+                destination = workflow.bundle(source, "rust-v0.161.0", "dev")
+            self.assertEqual((destination / "codex-code-mode-host").read_text(), "helper fixture")
+            self.assertTrue(os.access(destination / "codex-code-mode-host", os.X_OK))
+            self.assertEqual(workflow.validated_bundle(destination)["code_mode_host_sha256"], workflow.sha256(destination / "codex-code-mode-host"))
+            build = run.call_args_list[0].args[0]
+            self.assertIn("codex-code-mode-host", build)
 
 
 if __name__ == "__main__":

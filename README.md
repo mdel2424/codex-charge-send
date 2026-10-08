@@ -2,20 +2,27 @@
 
 An **unofficial community modification of Codex CLI**: hold Enter to choose
 reasoning effort, then release to send your prompt. It uses the existing Codex
-interface, authentication, and settings, with a separate `chargesend` command.
+interface, authentication, and settings. This project is built for personal use
+first: make your usual `codex` command launch ChargeSend, with the original CLI
+available as `codex-stock`.
 
 ## Usage
 
-For the project-local installation, run this from the repository directory to
-open ChargeSend in Kitty:
+For the existing project-local installation, map your command once:
 
 ```bash
-kitty --directory "$PWD" "$PWD/local/bin/chargesend" --no-daemon
+python3 scripts/chargesend.py link-codex --launcher "$PWD/local/bin/chargesend"
+codex --version
 ```
 
-Already in Kitty? Run `./local/bin/chargesend --no-daemon`. After installing on
-your PATH, use `chargesend --no-daemon` instead. `--no-daemon` runs without a
-shared background server.
+In Kitty, use `codex` or `codex resume <session-id>` as usual. Exit an existing
+stock CLI with `/quit` and reopen it to activate the modified interface.
+The mapping works without shell aliases, including Kitty's Bash POSIX mode.
+
+You can also run `./local/bin/chargesend` directly. Use the shared background
+server when resuming a session that is open there. `--no-daemon` starts a separate
+server and cannot resume a session while another server holds its writer lock;
+close the other client and allow its session to unload first.
 
 Wait until the agent is idle, then type your prompt:
 
@@ -40,19 +47,25 @@ export PATH="$HOME/.cargo/bin:$PATH"
 python3 scripts/chargesend.py build --tag rust-v0.161.0
 ```
 
-Install the resulting bundle as a separate command:
+Install the resulting bundle and make it your normal `codex` command:
 
 ```bash
 python3 scripts/chargesend.py install \
-  --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev
+  --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev \
+  --as-codex
 export PATH="$HOME/.local/bin:$PATH"
-chargesend --version
+codex --version
 ```
 
 The default location is `~/.local`. Add `--prefix ./local` to install inside the
-repository instead. Stock `codex` stays installed. Remove ChargeSend with
+repository instead. Omit `--as-codex` for a separate `chargesend` command.
+The native bundle includes its matching `codex-code-mode-host` runtime helper.
+Restore the original command with `python3 scripts/chargesend.py restore-codex`.
+Remove ChargeSend with
 `python3 scripts/chargesend.py uninstall`; add `--prefix ./local` to remove a
-project-local installation. Removal keeps your Codex settings and conversations.
+project-local installation. Uninstall restores a mapped `codex` at that prefix
+and keeps your settings and conversations. If you mapped a project-local launcher
+into `~/.local/bin`, run `restore-codex` before removing that project-local install.
 
 See the [build guide](docs/build.md) for prerequisites, offline downloads,
 optimized builds, and updating to another Codex release.
