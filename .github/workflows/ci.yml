@@ -27,6 +27,7 @@ jobs:
       CARGO_BUILD_JOBS: 2
       CARGO_INCREMENTAL: "0"
       RUST_BACKTRACE: "1"
+      RUST_MIN_STACK: "8388608"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
@@ -39,6 +40,9 @@ jobs:
         run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --component rust-src
       - name: Fetch, check patch, run focused and regression tests, compile CLI
         run: python3 scripts/chargesend.py build --tag '${{ matrix.tag }}'
+      - name: Scoped Rust lint check
+        working-directory: .build/upstream/${{ matrix.tag }}/codex-rs
+        run: cargo clippy --locked -p codex-tui --lib --tests
       - name: Verify independent launcher
         run: |
           bundles=(dist/chargesend-*)

@@ -80,6 +80,7 @@ impl ChatWidget {
             || self.is_user_turn_pending_or_running()
             || self.only_user_shell_commands_running()
             || self.is_plan_streaming_in_tui()
+            || self.input_queue.startup_submission.is_some()
             || self.pending_image_submission.is_some()
             || self.input_queue.suppress_queue_autosend
             || self.input_queue.recovered_queue
@@ -190,14 +191,25 @@ impl ChatWidget {
                 // Context was revalidated on this release, before the composer
                 // clears anything. The ordinary composer still validates content,
                 // resolves paste placeholders, and drains images and mentions.
+                let Some(thread) = self.thread_id else {
+                    return true;
+                };
                 let prompt_effort = PromptEffort {
-                    thread: self.thread_id.expect("eligible charge has a thread"),
+                    thread,
                     mode: self.effective_collaboration_mode(),
                     effort,
                 };
                 let result = self
                     .bottom_pane
                     .handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+                if matches!(
+                    result,
+                    InputResult::None | InputResult::ParentOwnedInputBlocked
+                ) {
+                    self.refresh_startup_recovery();
+                }
+                crate::startup_recovery::submitted(&result);
+                self.sync_backend_banner_view();
                 self.handle_composer_input_result_with_effort(result, false, Some(prompt_effort));
                 self.request_redraw();
                 true

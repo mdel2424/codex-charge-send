@@ -36,4 +36,9 @@ For live physical UI submissions, use short prompts and your normal account;
 the keycheck alone cannot verify request settings or composer routing.
 
 Step 1 passed with a physical keyboard in Kitty 0.45.0 on Ubuntu 26.04; see
-[kitty-0.45.0-enter.json](kitty-0.45.0-enter.json). Steps 2–8 remain outstanding.
+[kitty-0.45.0-enter.json](kitty-0.45.0-enter.json). The user also verified bar
+ascent/descent and Escape cancellation followed by Enter release in the compiled
+0.161.0 UI using `--no-daemon`; the draft remained and no prompt was submitted.
+[kitty-0.45.0-ui.json](kitty-0.45.0-ui.json) records that build's identity.
+Physical submissions, attachment cancellation, other transitions, and the
+remaining checks in steps 2–8 are outstanding.

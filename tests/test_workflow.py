@@ -71,6 +71,25 @@ class PatchWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(workflow.Failure, "different ChargeSend patch"):
             workflow.apply_to(self.source, "fixture")
 
+    def test_patch_change_during_compile_does_not_produce_a_misleading_bundle(self):
+        manifest = self.source / "codex-rs/cli/Cargo.toml"
+        manifest.parent.mkdir()
+        manifest.write_text('[package]\nname = "codex-cli"\n[[bin]]\nname = "codex"\n')
+        self.git("add", ".")
+        self.git("-c", "user.name=ChargeSend tests", "-c", "user.email=tests@example.invalid", "commit", "--quiet", "-m", "CLI fixture")
+        workflow.apply_to(self.source, "fixture")
+        original_run = workflow.run
+
+        def compile_and_edit(args, cwd=None, capture=False):
+            if args[:2] == ["cargo", "build"]:
+                self.patch.write_text(self.patch.read_text() + "\n")
+                return ""
+            return original_run(args, cwd=cwd, capture=capture)
+
+        with mock.patch.object(workflow, "run", side_effect=compile_and_edit):
+            with self.assertRaisesRegex(workflow.Failure, "different ChargeSend patch"):
+                workflow.bundle(self.source, "fixture", "dev")
+
     def test_source_commit_must_match_the_catalog(self):
         with self.assertRaisesRegex(workflow.Failure, "expected rust-v0.161.0"):
             workflow.checkout("rust-v0.161.0", str(self.source))

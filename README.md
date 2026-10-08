@@ -5,9 +5,9 @@ to choose the reasoning effort for an idle, new-turn prompt. Release Enter to
 send it. The existing Codex interface, agent, authentication, and configuration
 remain in use. The separate command is `chargesend`.
 
-This repository contains a source patch and six small module files rather than
-a fork of the entire Codex repository. It is prepared locally; nothing has been
-published to GitHub.
+This repository contains a source patch, dedicated modules, and their tests.
+Building it and publishing the repository
+or a release are separate steps.
 
 ## Interaction
 
@@ -28,10 +28,12 @@ remain excluded unless that exact advanced tier is already explicitly selected
 in the active settings. A charge changes one submitted request, including its
 Plan-mode collaboration settings; it does not write the selection to
 `config.toml`. Later requests explicitly restore their intended effort.
+The backend can retain the charged thread setting until that next request;
+restart/resume and multiple-client behavior need further verification.
 
 ## Terminal requirements
 
-The initial target is **Kitty directly**, outside tmux or GNU Screen. Both
+The initial target is **Kitty directly**, outside tmux, GNU Screen, Zellij, or SSH. Both
 keyboard-protocol event-type reporting and reporting all keys as escape codes
 must be negotiated and confirmed by Codex's startup query. Without confirmation,
 Enter submits normally and the UI explains that hold-to-charge is unavailable.
@@ -43,9 +45,9 @@ Additional terminals and multiplexers require their own keyboard and UI tests.
 
 | Terminal | Status |
 | --- | --- |
-| Direct Kitty 0.45.0 / Ubuntu 26.04 | Physical press/repeat/release protocol passed; full composer UI checklist pending |
+| Direct Kitty 0.45.0 / Ubuntu 26.04 | Physical key protocol, bar ascent/descent, and Escape cancellation passed on Codex 0.161.0; remaining manual checklist pending |
 | GNOME Terminal / Ptyxis with VTE 0.84.0 | Unavailable: this VTE baseline does not forward key releases; normal Enter fallback |
-| Kitty through tmux / GNU Screen | Charging disabled; unverified transport |
+| Kitty through tmux / GNU Screen / Zellij / SSH | Charging disabled; unverified transport |
 | Other terminals, SSH and remote transports | Unverified; normal Enter fallback |
 
 ## Build and install
@@ -104,8 +106,8 @@ At narrow terminal widths the effort label appears before the clipped bar.
 
 | Codex release | Pinned commit | Patch / compile / tests |
 | --- | --- | --- |
-| `0.161.0` | `979011409de0a60b52f179721948e65531d26144` | Full patch applies; compilation/tests in progress |
-| `0.160.0` | `a956835d020762cb2b570053af06f643a11c0ecc` | Full versioned patch applies; compilation/tests pending |
+| `0.161.0` | `979011409de0a60b52f179721948e65531d26144` | Native CLI built; 495 Rust tests passed; basic physical Kitty UI passed |
+| `0.160.0` | `a956835d020762cb2b570053af06f643a11c0ecc` | Native CLI built; 486 Rust tests passed; physical UI not tested on this baseline |
 
 [docs/verification.md](docs/verification.md) records what actually ran and what
 remains outstanding. [docs/manual-testing.md](docs/manual-testing.md) covers
@@ -126,4 +128,5 @@ notice. The Codex UI and help retain upstream names. The launcher reports
 ChargeSend's version and its upstream baseline with `--version`.
 
 ChargeSend is independently distributed and is not an OpenAI product or plugin.
-Contributions belong here; follow [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions belong here; follow [CONTRIBUTING.md](CONTRIBUTING.md). See
+[docs/publishing.md](docs/publishing.md) for preparing the separate GitHub project.

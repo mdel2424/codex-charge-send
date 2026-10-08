@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-08",
+  "platform": "Ubuntu 26.04",
+  "terminal": "Kitty 0.45.0, direct",
+  "upstream_tag": "rust-v0.161.0",
+  "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
+  "tested_binary_sha256": "b93464bf03a6cda0540ed692728f19a719720ba30a13e44d32c176dac6a4fcc3",
+  "tested_patch_fingerprint": "9d245e5f6793834513785e5cf59a6a0985390c8023466a77ac564fa2274e12a1",
+  "evidence": "Physical keyboard check reported by user",
+  "invocation": "local/bin/chargesend --no-daemon",
+  "observations": {
+    "hold_enter_bar_rises_and_descends": "passed",
+    "escape_while_enter_held_retains_draft": "passed",
+    "release_after_cancellation_does_not_submit": "passed"
+  },
+  "physical_submission_and_full_checklist": "outstanding; automated request tests cover submission settings"
+}

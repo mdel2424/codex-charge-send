@@ -34,10 +34,16 @@ submission is revalidated; an invalid envelope restores the draft/images.
 
 For a charged turn, the request's effort and collaboration-mode effort are set
 to the same value. This prevents a Plan-mode mask from overriding the charge.
-Once a request is accepted, an ordered OverrideTurnContext restores the intended
-thread effort and collaboration mode. Subsequent submissions also carry an
-explicit intended effort after the first charge. If the intended effort is
-unset, the active model's advertised default is used for the request.
+Subsequent submissions carry an explicit intended effort after the first charge.
+There is no immediate standalone thread-settings reset: upstream treats that
+operation as a manual settings change and cancels automatic continuations.
+If the intended effort is unset, the active model's advertised default is used
+for the request.
+
+The backend's saved thread effort can remain at the last charged value until the
+next submission. The current widget retains its intended defaults and makes the
+next request explicit. Restart/resume and multiple-client synchronization still
+need physical/end-to-end verification; the patch never writes config.toml.
 
 The backend can echo request settings as thread settings. A bounded queue
 recognizes complete mode/model/effort echoes from accepted ChargeSend requests

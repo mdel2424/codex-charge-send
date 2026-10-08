@@ -26,11 +26,19 @@ python3 scripts/chargesend.py build --tag rust-v0.161.0 --profile dev
 checks the entire patch before applying it, and copies `overlays.json` modules.
 `test` uses pinned rustfmt and runs ChargeSend, existing composer, Plan-mode, and
 event-stream tests. `build` repeats those checks before compiling `codex-cli`.
+The test runner uses an 8 MiB thread stack, matching upstream's test workflow.
+The standalone patch workflow uses Cargo's lib-test runner with focused filters.
+During local verification, upstream's `just`, nextest, and cargo-insta frontends
+were unavailable in the offline cache; inline snapshots were reviewed directly.
+Only Rust sources change in upstream, so the workflow runs its pinned rustfmt
+without the unrelated Python, Bazel, and justfile formatters.
 
 Use `--source /path/to/clean/upstream` to supply a full checkout already at the
 expected commit. A dirty checkout, unexpected commit, edited prepared sources,
 or overlay collision stops with a diagnostic. The workflow never resets a
 supplied checkout. An unchanged prepared checkout can be reused after interruption.
+Inputs and source hashes are rechecked after compilation so an edit during the
+build cannot produce a bundle with a misleading patch fingerprint.
 After changing the patch or modules, use a fresh checkout.
 
 For constrained machines, the following keeps memory and debug output smaller:
@@ -102,3 +110,4 @@ data are retained. Old versioned bundles remain available until uninstall.
 
 Preparing or testing a release does not publish it. Repository creation, remote
 configuration, pushing, and releases are separate actions.
+GitHub Actions also runs a scoped Clippy check against each supported baseline.

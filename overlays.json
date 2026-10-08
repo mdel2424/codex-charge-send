@@ -4,5 +4,8 @@
   "module/chargesend/capability.rs": "codex-rs/tui/src/chargesend/capability.rs",
   "module/chatwidget_chargesend.rs": "codex-rs/tui/src/chatwidget/chargesend.rs",
   "module/chatwidget_chargesend_tests.rs": "codex-rs/tui/src/chatwidget/chargesend_tests.rs",
-  "module/app_chargesend.rs": "codex-rs/tui/src/app/chargesend.rs"
+  "module/app_chargesend.rs": "codex-rs/tui/src/app/chargesend.rs",
+  "module/chargesend/controller_tests.rs": "codex-rs/tui/src/chargesend/controller_tests.rs",
+  "module/chargesend/capability_tests.rs": "codex-rs/tui/src/chargesend/capability_tests.rs",
+  "module/app_chargesend_tests.rs": "codex-rs/tui/src/app/app_chargesend_tests.rs"
 }

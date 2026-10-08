@@ -1,0 +1,43 @@
+{
+  "product": "ChargeSend",
+  "version": "0.1.0",
+  "date": "2026-10-08",
+  "platform": "Ubuntu 26.04, x86_64 Linux",
+  "releases": {
+    "rust-v0.161.0": {
+      "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
+      "patch_fingerprint": "690f6320f071d35993e66eae63b2e798e135f0dedd60d044e404b6726ed72cb5",
+      "binary_sha256": "252144ce085007b30cc9a6bbf871f23ab22fea8acbcc2b093d41578522d3014f",
+      "bundle": "dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev",
+      "native_compilation": "passed",
+      "rust_tests": {
+        "chargesend": 26,
+        "composer": 396,
+        "plan_mode": 63,
+        "event_stream": 10
+      },
+      "total_rust_tests": 495,
+      "clippy": "passed"
+    },
+    "rust-v0.160.0": {
+      "upstream_commit": "a956835d020762cb2b570053af06f643a11c0ecc",
+      "patch_fingerprint": "ab646ac16b768d5b01b75b859db48176af0ed198c045c8f64637258b2e2a7a76",
+      "binary_sha256": "3b312e9a46eb523902c755b14325b4d072d2fdc124d904e612519c35f63aa0f0",
+      "bundle": "dist/chargesend-0.1.0-codex-0.160.0-x86_64-unknown-linux-gnu-dev",
+      "native_compilation": "passed",
+      "rust_tests": {
+        "chargesend": 26,
+        "composer": 387,
+        "plan_mode": 63,
+        "event_stream": 10
+      },
+      "total_rust_tests": 486,
+      "clippy": "passed"
+    }
+  },
+  "python_workflow_tests": 12,
+  "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
+  "physical_ui_evidence": "kitty-0.45.0-ui.json",
+  "github_actions": "prepared locally, not run",
+  "live_inference": "not used"
+}

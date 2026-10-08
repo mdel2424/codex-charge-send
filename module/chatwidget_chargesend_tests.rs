@@ -6,7 +6,9 @@ use super::*;
 use crate::app_command::AppCommand as Op;
 use crate::chatwidget::tests::make_chatwidget_manual_with_sender;
 use crate::render::renderable::Renderable;
+use codex_protocol::openai_models::InputModality;
 use codex_protocol::openai_models::ReasoningEffortPreset;
+use pretty_assertions::assert_eq;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 type Fixture = (
@@ -52,6 +54,7 @@ fn assert_no_submit_op(receiver: &mut UnboundedReceiver<Op>) {
 
 fn catalog(chat: &mut ChatWidget, efforts: Vec<ReasoningEffortConfig>) {
     let mut preset = chat.current_model_preset().expect("fixture model exists");
+    preset.input_modalities = vec![InputModality::Text, InputModality::Image];
     preset.default_reasoning_effort = ReasoningEffortConfig::Medium;
     preset.supported_reasoning_efforts = efforts
         .into_iter()
@@ -108,6 +111,7 @@ fn assert_effort(op: &Op, effort: ReasoningEffortConfig, kind: ModeKind) {
 struct StickyBackend {
     effort: Option<ReasoningEffortConfig>,
     captured: Vec<Option<ReasoningEffortConfig>>,
+    settings_updates: usize,
 }
 
 impl StickyBackend {
@@ -131,6 +135,7 @@ impl StickyBackend {
                 collaboration_mode,
                 ..
             } => {
+                self.settings_updates += 1;
                 if let Some(effort) = effort {
                     self.effort = effort;
                 }
@@ -150,7 +155,7 @@ impl StickyBackend {
 }
 
 #[tokio::test(start_paused = true)]
-async fn chargesend_tap_submits_once_and_restores_backend_default() {
+async fn chargesend_tap_submits_once_and_keeps_intended_default() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
     let original = chat.effective_collaboration_mode();
     let config_file = chat.config.codex_home.join("config.toml");
@@ -167,7 +172,12 @@ async fn chargesend_tap_submits_once_and_restores_backend_default() {
     let mut backend = StickyBackend::default();
     backend.accept(op);
     backend.drain(&mut op_rx);
-    assert_eq!(backend.effort, Some(ReasoningEffortConfig::High));
+    assert_eq!(backend.effort, Some(ReasoningEffortConfig::Low));
+    assert_eq!(backend.captured, vec![Some(ReasoningEffortConfig::Low)]);
+    assert_eq!(
+        backend.settings_updates, 0,
+        "a charge must not cancel backend continuations through a standalone settings update"
+    );
     enter(&mut chat, KeyEventKind::Release);
     assert_no_submit_op(&mut op_rx);
     assert_eq!(chat.effective_collaboration_mode(), original);
@@ -202,13 +212,11 @@ async fn chargesend_hold_and_descending_release_use_painted_effort() {
 #[tokio::test]
 async fn chargesend_escape_retains_draft_and_attachment() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
-    chat.bottom_pane.set_composer_text(
-        "keep this".to_string(),
-        Vec::new(),
-        vec![PathBuf::from("/tmp/chargesend-image.png")],
-    );
+    draft(&mut chat, "keep this");
+    chat.attach_image(PathBuf::from("/tmp/chargesend-image.png"));
     let before = chat.bottom_pane.composer_text();
     enter(&mut chat, KeyEventKind::Press);
+    assert!(chat.chargesend_active());
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     assert_eq!(chat.bottom_pane.composer_text(), before);
     // The canceled Enter's repeats and release cannot drain the attachment.
@@ -413,14 +421,14 @@ async fn chargesend_followup_explicitly_restores_intended_effort_and_echoes() {
         unreachable!()
     };
     let intended = chat
-        .chargesend_echo_mode(&sent)
+        .chargesend_echo_mode(sent)
         .expect("charge echo is recognized");
     assert_eq!(
         intended.reasoning_effort(),
         Some(ReasoningEffortConfig::High)
     );
     assert!(
-        chat.chargesend_echo_mode(&sent).is_none(),
+        chat.chargesend_echo_mode(sent).is_none(),
         "echo consumed once"
     );
     let mut backend = StickyBackend::default();
@@ -512,11 +520,26 @@ async fn chargesend_image_preparation_retains_its_prompt_effort() {
         .save(&path)
         .unwrap();
     chat.snapshot_local_images = true;
-    chat.bottom_pane
-        .set_composer_text("image prompt".to_string(), Vec::new(), vec![path]);
+    draft(&mut chat, "image prompt");
+    chat.attach_image(path);
+    assert!(chat.current_model_supports_images());
+    assert!(
+        chat.chargesend_context().is_some(),
+        "image composer must be eligible"
+    );
     enter(&mut chat, KeyEventKind::Press);
+    assert!(
+        chat.chargesend_active(),
+        "image Enter press must start a charge"
+    );
     enter(&mut chat, KeyEventKind::Release);
-    assert!(chat.pending_image_submission.is_some());
+    assert!(
+        chat.pending_image_submission.is_some(),
+        "image preparation missing; operation {:?}; remaining text {:?}; images {}",
+        op_rx.try_recv(),
+        chat.bottom_pane.composer_text(),
+        chat.bottom_pane.composer_local_images().len()
+    );
     assert_no_submit_op(&mut op_rx);
     let id = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
@@ -535,23 +558,56 @@ async fn chargesend_image_preparation_retains_its_prompt_effort() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn chargesend_bar_uses_measured_composer_space_at_narrow_widths() {
     let (mut chat, _rx, _op_rx) = fixture().await;
     enter(&mut chat, KeyEventKind::Press);
     chat.paint_chargesend();
+    let mut snapshots = Vec::new();
     for width in [8, 24, 80] {
         let height = chat.bottom_pane.desired_height(width);
         let area = ratatui::layout::Rect::new(0, 0, width, height);
         let mut buffer = ratatui::buffer::Buffer::empty(area);
         chat.bottom_pane.render(area, &mut buffer);
-        let visible: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
+        let visible = buffer
+            .content
+            .chunks(usize::from(width))
+            .map(|row| {
+                row.iter()
+                    .map(ratatui::buffer::Cell::symbol)
+                    .collect::<String>()
+                    .trim_end()
+                    .to_string()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         assert!(
             visible.contains("Low"),
             "effort label must survive clipping at {width} columns"
         );
         assert_eq!(chat.bottom_pane.composer_text(), "hello");
+        snapshots.push(format!("{width} columns:\n{visible}"));
     }
+    insta::assert_snapshot!(snapshots.join("\n\n"), @"
+    8 columns:
+
+    › hello
+
+
+      Low [-
+
+    24 columns:
+
+    › hello
+
+      Low [------------] ^ ·
+
+    80 columns:
+
+    › hello
+
+      Low [------------] ^ · release Enter to send · Esc cancels
+    ");
 }
 
 #[tokio::test]
@@ -563,10 +619,18 @@ async fn chargesend_pending_images_restore_on_mode_change() {
         .save(&path)
         .unwrap();
     chat.snapshot_local_images = true;
-    chat.bottom_pane
-        .set_composer_text("keep image".to_string(), Vec::new(), vec![path]);
+    draft(&mut chat, "keep image");
+    chat.attach_image(path);
     enter(&mut chat, KeyEventKind::Press);
+    assert!(
+        chat.chargesend_active(),
+        "image Enter press must start a charge"
+    );
     enter(&mut chat, KeyEventKind::Release);
+    assert!(
+        chat.pending_image_submission.is_some(),
+        "expected delayed image preparation"
+    );
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::Medium));
     let id = tokio::time::timeout(Duration::from_secs(10), async {
         loop {

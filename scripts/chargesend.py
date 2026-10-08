@@ -44,7 +44,7 @@ def run(args: list[str], cwd: Path | None = None, capture: bool = False) -> str:
     except FileNotFoundError as error:
         raise Failure(f"Missing executable {args[0]}. See docs/build.md.") from error
     except subprocess.CalledProcessError as error:
-        detail = (error.stderr or error.stdout or "").strip()
+        detail = "\n".join(part.strip() for part in [error.stdout, error.stderr] if part and part.strip())
         raise Failure(f"Command failed: {shlex.join(args)}\n{detail}") from error
     return result.stdout.strip() if capture else ""
 
@@ -189,12 +189,14 @@ def prepare(args: argparse.Namespace) -> Path:
 
 
 def test_source(source: Path) -> None:
+    # Match upstream's justfile and Rust CI: large TUI fixtures need 8 MiB.
+    os.environ.setdefault("RUST_MIN_STACK", "8388608")
     workspace = source / "codex-rs"
     # Format using the upstream-pinned rustfmt, rather than a different host
     # formatter. This also parses every patched module before compilation.
-    run(["cargo", "fmt", "--all"], cwd=workspace)
+    run(["cargo", "fmt", "--all"], cwd=workspace, capture=True)
     record_prepared_files(source)
-    run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace)
+    run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace, capture=True)
     for filter_name in ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests"]:
         run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace)
 
@@ -220,6 +222,9 @@ def bundle(source: Path, tag: str, profile: str) -> Path:
         raise Failure("Upstream CLI binary layout changed. Inspect cli/Cargo.toml before porting.")
     workspace = source / "codex-rs"
     run(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
+    # Refuse a misleading manifest if patch inputs or prepared source changed
+    # while the compiler was running.
+    apply_to(source, tag)
     target_triple = next(line.removeprefix("host: ") for line in run(["rustc", "-vV"], cwd=workspace, capture=True).splitlines() if line.startswith("host: "))
     build_id = f"chargesend-{VERSION}-codex-{tag.removeprefix('rust-v')}-{target_triple}-{profile}"
     destination = ROOT / "dist" / build_id
