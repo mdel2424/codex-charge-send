@@ -1,59 +1,38 @@
 # ChargeSend
 
-ChargeSend is an **unofficial community modification of Codex CLI**. Hold Enter
-to choose the reasoning effort for an idle, new-turn prompt. Release Enter to
-send it. The existing Codex interface, agent, authentication, and configuration
-remain in use. The separate command is `chargesend`.
+An **unofficial community modification of Codex CLI**: hold Enter to choose
+reasoning effort, then release to send your prompt. It uses the existing Codex
+interface, authentication, and settings, with a separate `chargesend` command.
 
-This repository contains a source patch, dedicated modules, and their tests.
-Building it and publishing the repository
-or a release are separate steps.
+## Usage
 
-## Interaction
+For the project-local installation, run this from the repository directory to
+open ChargeSend in Kitty:
 
-- Tap Enter: submit at the lowest effort offered by the active model.
-- Hold Enter: the composer shows an effort label and a bar. The bar reaches the
-  top after two seconds, descends over two seconds, and repeats.
-- Release Enter: submit once at the effort label most recently drawn.
-- Escape: cancel and keep the draft and attachments. Release Enter before trying
-  again. Editing, focus loss, or a context transition also cancels a charge.
+```bash
+kitty --directory "$PWD" "$PWD/local/bin/chargesend" --no-daemon
+```
 
-Charging is limited to an idle, eligible prompt composer. Menus, approval dialogs,
-completion popups, slash commands, newline shortcuts, paste classification,
-external editing, and steering or queuing during a running turn use Codex's
-existing input paths. Charging cannot change a turn that is already running.
+Already in Kitty? Run `./local/bin/chargesend --no-daemon`. After installing on
+your PATH, use `chargesend --no-daemon` instead. `--no-daemon` runs without a
+shared background server.
 
-Effort choices come from the active model's advertised choices. Max and Ultra
-remain excluded unless that exact advanced tier is already explicitly selected
-in the active settings. A charge changes one submitted request, including its
-Plan-mode collaboration settings; it does not write the selection to
-`config.toml`. Later requests explicitly restore their intended effort.
-The backend can retain the charged thread setting until that next request;
-restart/resume and multiple-client behavior need further verification.
+Wait until the agent is idle, then type your prompt:
 
-## Terminal requirements
-
-The initial target is **Kitty directly**, outside tmux, GNU Screen, Zellij, or SSH. Both
-keyboard-protocol event-type reporting and reporting all keys as escape codes
-must be negotiated and confirmed by Codex's startup query. Without confirmation,
-Enter submits normally and the UI explains that hold-to-charge is unavailable.
-See [Kitty's keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
-
-Set `CHARGESEND_DISABLE=1` to use ordinary Enter submission. Codex's existing
-`CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT` setting also prevents charging.
-Additional terminals and multiplexers require their own keyboard and UI tests.
-
-| Terminal | Status |
+| Action | Result |
 | --- | --- |
-| Direct Kitty 0.45.0 / Ubuntu 26.04 | Physical key protocol, bar ascent/descent, and Escape cancellation passed on Codex 0.161.0; remaining manual checklist pending |
-| GNOME Terminal / Ptyxis with VTE 0.84.0 | Unavailable: this VTE baseline does not forward key releases; normal Enter fallback |
-| Kitty through tmux / GNU Screen / Zellij / SSH | Charging disabled; unverified transport |
-| Other terminals, SSH and remote transports | Unverified; normal Enter fallback |
+| Tap Enter | Send at the lowest allowed effort. |
+| Hold Enter | Watch the effort bar rise for two seconds, descend for two seconds, and repeat. |
+| Release Enter | Send once using the displayed effort. |
+| Press Escape while holding | Cancel and keep the draft and attachments. Release Enter before trying again. |
+
+Menus, slash commands, newline shortcuts, paste, attachments, and input during
+a running turn keep their normal Codex behavior. Charging selects effort for a
+new turn; it cannot change a turn already running.
 
 ## Build and install
 
-Ubuntu 26.04 is the development target. Python 3.11+, Git, Rust 1.95.0, and native
-build dependencies are required. Run the setup in your normal terminal:
+From the repository directory on Ubuntu 26.04:
 
 ```bash
 bash scripts/setup-ubuntu.sh
@@ -61,72 +40,65 @@ export PATH="$HOME/.cargo/bin:$PATH"
 python3 scripts/chargesend.py build --tag rust-v0.161.0
 ```
 
-The build checks the pinned upstream commit, applies the patch, runs focused and
-regression tests, and compiles the actual Codex CLI. A patch conflict stops before
-changing the checkout. The default development build is faster than a release
-build; add `--profile release` for an optimized binary.
-
-The output is a versioned directory under `dist/`, containing the native binary,
-`bin/chargesend` launcher, notices, and a manifest recording its exact upstream
-baseline and checksums. Select that directory explicitly:
+Install the resulting bundle as a separate command:
 
 ```bash
-python3 scripts/chargesend.py install --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev
+python3 scripts/chargesend.py install \
+  --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev
+export PATH="$HOME/.local/bin:$PATH"
 chargesend --version
-chargesend
 ```
 
-Installation defaults to `~/.local/bin/chargesend` and a versioned bundle under
-`~/.local/lib/chargesend`. Put `~/.local/bin` on your PATH if needed. Use
-`--prefix ./local` for a project-local installation. It does not replace `codex`.
-ChargeSend uses your ordinary Codex settings and conversation data.
+The default location is `~/.local`. Add `--prefix ./local` to install inside the
+repository instead. Stock `codex` stays installed. Remove ChargeSend with
+`python3 scripts/chargesend.py uninstall`; add `--prefix ./local` to remove a
+project-local installation. Removal keeps your Codex settings and conversations.
 
-Remove the separate command and its managed bundles:
+See the [build guide](docs/build.md) for prerequisites, offline downloads,
+optimized builds, and updating to another Codex release.
 
-```bash
-python3 scripts/chargesend.py uninstall
-```
+## Compatibility
 
-This retains Codex, authentication, configuration, and conversation data. Full
-build, offline download, and update instructions are in [docs/build.md](docs/build.md).
+Charging requires **Kitty directly**, outside tmux, Screen, Zellij, or SSH.
+Startup verifies the keyboard capabilities needed for Enter releases. If they
+are unavailable, Enter sends normally and the UI shows an unavailable notice.
 
-## Adjustable timing
+| Terminal | Status |
+| --- | --- |
+| Kitty 0.45.0 on Ubuntu 26.04 | Physical Enter events, bar ascent/descent, and Escape cancellation verified on Codex 0.161.0. |
+| GNOME Terminal / Ptyxis with VTE 0.84.0 | No key releases; ordinary Enter fallback. |
+| Other terminals, multiplexers, and SSH | Unverified; charging disabled. |
 
-| Environment variable | Default | Meaning |
-| --- | --- | --- |
-| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of each ascent or descent; 250–60000 ms |
-| `CHARGESEND_TAP_MS` | `150` | Tap always selects the lowest effort; less than half the ascent duration |
-| `CHARGESEND_FRAME_MS` | `33` | Redraw interval; 10–100 ms |
+| Codex baseline | Automated verification |
+| --- | --- |
+| 0.161.0 | Native CLI built; 495 Rust tests passed. |
+| 0.160.0 | Native CLI built; 486 Rust tests passed; physical UI check pending. |
 
-Invalid timing values log a warning and use all defaults. Time comes from a
-monotonic clock, so key repeats and changes to the wall clock do not drive charge.
-At narrow terminal widths the effort label appears before the clipped bar.
+The [verification record](docs/verification.md) distinguishes automated results
+from physical checks. The full [manual checklist](docs/manual-testing.md) still
+needs completion, including release-to-submit in the actual UI.
 
-## Compatibility and verification
+## Settings and limits
 
-| Codex release | Pinned commit | Patch / compile / tests |
-| --- | --- | --- |
-| `0.161.0` | `979011409de0a60b52f179721948e65531d26144` | Native CLI built; 495 Rust tests passed; basic physical Kitty UI passed |
-| `0.160.0` | `a956835d020762cb2b570053af06f643a11c0ecc` | Native CLI built; 486 Rust tests passed; physical UI not tested on this baseline |
+Effort choices come from the active model. Max and Ultra require that exact tier
+to be explicitly selected in the active settings. The charge applies to the
+submitted request, including Plan mode, without writing to `config.toml`.
+Later submissions explicitly use their intended effort. The backend can retain
+the charged thread setting until the next submission; restart/resume and
+multiple-client behavior need further testing.
 
-[docs/verification.md](docs/verification.md) records what actually ran and what
-remains outstanding. [docs/manual-testing.md](docs/manual-testing.md) covers
-physical keys and full terminal behavior. A passing CI build alone does not
-verify physical key releases.
+Set `CHARGESEND_HALF_CYCLE_MS=1000` for a one-second ascent and descent, or
+`CHARGESEND_DISABLE=1` for ordinary Enter submission. See the
+[timing options](docs/build.md#timing-options) for all defaults and ranges.
 
-The integration is intentionally small but touches upstream composer, app, and
-submission code that changes frequently. See [docs/architecture.md](docs/architecture.md)
-and the porting procedure before adding another release. GitHub Actions checks
-both catalogued release tags; those jobs only run after the repository is pushed.
+## Development and license
 
-## License and attribution
-
-ChargeSend and its modifications are licensed under [Apache 2.0](LICENSE), the
-same license as Codex. [NOTICE](NOTICE) identifies the changes and reproduces
-upstream attribution; [UPSTREAM-NOTICE](UPSTREAM-NOTICE) preserves the original
-notice. The Codex UI and help retain upstream names. The launcher reports
-ChargeSend's version and its upstream baseline with `--version`.
+The repository contains the source patch, dedicated charging modules, tests,
+and GitHub Actions checks for both supported releases. See the
+[architecture](docs/architecture.md), [contribution guide](CONTRIBUTING.md),
+and [publishing guide](docs/publishing.md). Publishing is a separate step.
 
 ChargeSend is independently distributed and is not an OpenAI product or plugin.
-Contributions belong here; follow [CONTRIBUTING.md](CONTRIBUTING.md). See
-[docs/publishing.md](docs/publishing.md) for preparing the separate GitHub project.
+It is licensed under [Apache 2.0](LICENSE). [NOTICE](NOTICE) records the
+modifications and attribution; [UPSTREAM-NOTICE](UPSTREAM-NOTICE) preserves
+the original notice.

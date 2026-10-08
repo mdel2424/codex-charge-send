@@ -84,6 +84,29 @@ The installer refuses an existing unmanaged command. The uninstaller removes
 only managed ChargeSend launchers and validated bundles. Stock `codex` and user
 data are retained. Old versioned bundles remain available until uninstall.
 
+## Timing options
+
+Set these environment variables before launching ChargeSend:
+
+| Environment variable | Default | Meaning |
+| --- | --- | --- |
+| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of each ascent or descent; 250–60000 ms. |
+| `CHARGESEND_TAP_MS` | `150` | Tap always selects the lowest effort; less than half the ascent duration. |
+| `CHARGESEND_FRAME_MS` | `33` | Redraw interval; 10–100 ms. |
+
+For example, in Kitty with the project-local installation:
+
+```bash
+CHARGESEND_HALF_CYCLE_MS=1000 ./local/bin/chargesend --no-daemon
+```
+
+Invalid timing values log a warning and use all defaults. A monotonic clock
+drives charging, independent of key repeats and changes to the wall clock.
+At narrow terminal widths the effort label appears before the clipped bar.
+
+Set `CHARGESEND_DISABLE=1` for ordinary Enter submission. Codex's existing
+`CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT` setting also prevents charging.
+
 ## Port to another release
 
 1. Inspect installed `codex --version` and obtain its exact public release source.
