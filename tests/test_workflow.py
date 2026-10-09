@@ -264,6 +264,63 @@ class InstallationTests(unittest.TestCase):
         self.assertEqual(target.read_text(), "keep")
 
 
+class V8EnvironmentTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="chargesend-v8-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        patcher = mock.patch.object(workflow, "ROOT", self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def source(self, name):
+        source = self.root / name
+        package = source / "scripts/codex_package"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("")
+        (package / "targets.py").write_text(
+            'import os\nfrom pathlib import Path\n'
+            'REPO_ROOT = Path(os.environ["CODEX_REPO_ROOT"])\n'
+            'TARGET_SPECS = {"fixture-target": "fixture-target"}\n'
+        )
+        # A real child import checks source/target/cache routing without downloads.
+        (package / "v8.py").write_text(
+            'from .targets import REPO_ROOT\n'
+            'def resolve_codex_v8_cargo_env(spec, *, cache_root):\n'
+            '    version = (REPO_ROOT / "codex-rs/Cargo.lock").read_text().strip()\n'
+            '    directory = cache_root / version / spec\n'
+            '    return {"RUSTY_V8_ARCHIVE": str(directory / "archive.a.gz"),\n'
+            '            "RUSTY_V8_SRC_BINDING_PATH": str(directory / "binding.rs")}\n'
+        )
+        (source / "codex-rs").mkdir()
+        (source / "codex-rs/Cargo.lock").write_text(name)
+        return source
+
+    def test_resolver_uses_each_checkout_and_keeps_overrides_scoped(self):
+        for name in ["first-release", "second-release"]:
+            with self.subTest(release=name):
+                source = self.source(name)
+                with mock.patch.dict(os.environ, {"CODEX_REPO_ROOT": "caller-root", "CARGO_BUILD_JOBS": "2"}):
+                    original_env = dict(os.environ)
+                    env = workflow.code_mode_build_env(source, "fixture-target")
+                    self.assertEqual(dict(os.environ), original_env)
+                cache = self.root / ".build/v8" / name / "fixture-target"
+                self.assertEqual(env["RUSTY_V8_ARCHIVE"], str(cache / "archive.a.gz"))
+                self.assertEqual(env["RUSTY_V8_SRC_BINDING_PATH"], str(cache / "binding.rs"))
+                self.assertEqual(env["CARGO_BUILD_JOBS"], "2")
+                self.assertEqual(env["CODEX_REPO_ROOT"], "caller-root")
+                self.assertFalse(list(source.rglob("__pycache__")), "resolver must not dirty the guarded checkout")
+
+    def test_upstream_validation_failure_stops_the_build_with_context(self):
+        source = self.source("invalid-release")
+        (source / "scripts/codex_package/v8.py").write_text(
+            'def resolve_codex_v8_cargo_env(*args, **kwargs):\n'
+            '    raise RuntimeError("V8 checksum manifest does not match its trusted SHA-256.")\n'
+        )
+        with self.assertRaisesRegex(workflow.Failure, r"(?s)Could not prepare Codex V8.*trusted SHA-256"):
+            workflow.code_mode_build_env(source, "fixture-target")
+
+
 class BundleTests(unittest.TestCase):
     def test_bundle_copies_runtime_helper_and_records_checksum(self):
         with tempfile.TemporaryDirectory(prefix="chargesend-bundle-") as directory:
@@ -280,18 +337,24 @@ class BundleTests(unittest.TestCase):
             (binaries / "codex-code-mode-host").chmod(0o755)
             for name in ["LICENSE", "NOTICE", "UPSTREAM-NOTICE"]:
                 (root / name).write_text("notice fixture")
-            def fake_run(args, cwd=None, capture=False):
+            def fake_run(args, cwd=None, capture=False, env=None):
                 return "host: test-target" if args == ["rustc", "-vV"] else "rustc fixture" if args == ["rustc", "--version"] else ""
-            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "installed_code_mode_host", return_value=None), mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
+            v8_env = {"RUSTY_V8_ARCHIVE": "/fixture/archive.a.gz", "RUSTY_V8_SRC_BINDING_PATH": "/fixture/binding.rs"}
+            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "code_mode_build_env", return_value=v8_env) as resolve, mock.patch.object(workflow, "installed_code_mode_host", return_value=None), mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
                 destination = workflow.bundle(source, "rust-v0.161.0", "dev")
+            resolve.assert_called_once_with(source, "test-target")
             self.assertEqual((destination / "codex-code-mode-host").read_text(), "helper fixture")
             self.assertTrue(os.access(destination / "codex-code-mode-host", os.X_OK))
             self.assertEqual(workflow.validated_bundle(destination)["code_mode_host_sha256"], workflow.sha256(destination / "codex-code-mode-host"))
             builds = [call.args[0] for call in run.call_args_list if call.args[0][:2] == ["cargo", "build"]]
             self.assertEqual(len(builds), 2)
             self.assertIn("codex-code-mode-host", builds[1])
-            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
+            build_calls = [call for call in run.call_args_list if call.args[0][:2] == ["cargo", "build"]]
+            self.assertNotIn("env", build_calls[0].kwargs)
+            self.assertEqual(build_calls[1].kwargs["env"], v8_env)
+            with mock.patch.object(workflow, "ROOT", root), mock.patch.object(workflow, "run", side_effect=fake_run) as run, mock.patch.object(workflow, "code_mode_build_env") as resolve, mock.patch.object(workflow, "apply_to"), mock.patch.object(workflow, "fingerprint", return_value="fixture"), mock.patch.object(workflow.subprocess, "check_output", return_value=b"version = 4\n"), mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(workspace / "target")}):
                 workflow.bundle(source, "rust-v0.161.0", "dev", binaries / "codex-code-mode-host")
+            resolve.assert_not_called()
             builds = [call.args[0] for call in run.call_args_list if call.args[0][:2] == ["cargo", "build"]]
             self.assertEqual(len(builds), 1, "prebuilt helper avoids compiling the JavaScript engine")
 

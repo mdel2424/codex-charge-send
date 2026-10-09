@@ -35,10 +35,11 @@ class Failure(Exception):
     pass
 
 
-def run(args: list[str], cwd: Path | None = None, capture: bool = False) -> str:
+def run(args: list[str], cwd: Path | None = None, capture: bool = False,
+        env: dict[str, str] | None = None) -> str:
     try:
         result = subprocess.run(
-            args, cwd=cwd, check=True, text=True,
+            args, cwd=cwd, check=True, text=True, env=env,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.PIPE if capture else None,
         )
@@ -233,6 +234,34 @@ def installed_code_mode_host(tag: str) -> Path | None:
     return None
 
 
+def code_mode_build_env(source: Path, target: str) -> dict[str, str]:
+    """Use the pinned upstream package resolver for verified V8 artifacts."""
+    if not (source / "scripts/codex_package/v8.py").is_file():
+        raise Failure("Upstream V8 package resolver is missing. Inspect scripts/codex_package before porting.")
+    # Isolate imports across release tags and avoid creating untracked pycache
+    # files in the prepared checkout. Upstream verifies both artifacts against
+    # a checksum manifest whose hash is pinned in this exact release source.
+    script = """
+import json
+from pathlib import Path
+import sys
+sys.path.insert(0, sys.argv[1])
+from codex_package.targets import TARGET_SPECS
+from codex_package.v8 import resolve_codex_v8_cargo_env
+print(json.dumps(resolve_codex_v8_cargo_env(
+    TARGET_SPECS[sys.argv[2]], cache_root=Path(sys.argv[3]))))
+"""
+    print(f"Preparing checksum-verified Codex V8 artifacts for {target}...", flush=True)
+    try:
+        overrides = json.loads(run(
+            [sys.executable, "-B", "-c", script, str(source / "scripts"), target, str(ROOT / ".build/v8")],
+            cwd=source, capture=True, env={**os.environ, "CODEX_REPO_ROOT": str(source)},
+        ))
+    except Failure as error:
+        raise Failure(f"Could not prepare Codex V8 artifacts for {target}.\n{error}") from error
+    return {**os.environ, **overrides}
+
+
 def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = None) -> Path:
     cargo_manifest = tomllib.loads((source / "codex-rs/cli/Cargo.toml").read_text())
     package_name = cargo_manifest["package"]["name"]
@@ -243,12 +272,14 @@ def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = N
     if helper is not None and (not helper.is_file() or not os.access(helper, os.X_OK)):
         raise Failure(f"{helper} is not an executable code-mode runtime helper.")
     run(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
+    apply_to(source, tag)
+    target_triple = next(line.removeprefix("host: ") for line in run(["rustc", "-vV"], cwd=workspace, capture=True).splitlines() if line.startswith("host: "))
     if helper is None:
-        run(["cargo", "build", "--locked", "-p", "codex-code-mode-host", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace)
+        run(["cargo", "build", "--locked", "-p", "codex-code-mode-host", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace,
+            env=code_mode_build_env(source, target_triple))
     # Refuse a misleading manifest if patch inputs or prepared source changed
     # while the compiler was running.
     apply_to(source, tag)
-    target_triple = next(line.removeprefix("host: ") for line in run(["rustc", "-vV"], cwd=workspace, capture=True).splitlines() if line.startswith("host: "))
     build_id = f"chargesend-{VERSION}-codex-{tag.removeprefix('rust-v')}-{target_triple}-{profile}"
     destination = ROOT / "dist" / build_id
     destination.mkdir(parents=True, exist_ok=True)

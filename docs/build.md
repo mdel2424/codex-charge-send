@@ -28,7 +28,11 @@ checks the entire patch before applying it, and copies `overlays.json` modules.
 event-stream tests. `build` repeats those checks before compiling `codex-cli`.
 It reuses `codex-code-mode-host` from an installed official package of the exact
 baseline version when available; otherwise it compiles the helper separately
-from the pinned source. The bundle records the helper's origin and checksum.
+from the pinned source. Source builds use upstream's package resolver to fetch
+Codex's V8 archive and matching Rust bindings, verify their checksums against the
+release's pinned manifest, and cache them in `.build/v8`. The sandbox-enabled
+archive is published in Codex's releases rather than the default rusty_v8 URL.
+The bundle records the helper's origin and checksum.
 Pass `--code-mode-host /path/to/compatible/codex-code-mode-host` to supply one
 explicitly. This avoids the JavaScript engine's separate V8 archive download
 when rebuilding for personal use; Cargo's offline mode does not cache that archive.
