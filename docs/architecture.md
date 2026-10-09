@@ -22,11 +22,11 @@ green–yellow–red gradient and a label colored by charge position.
 tier is resolved before charging. Tap and every new press use that tier.
 The charge bar pads the effort name to a fixed ten-character field.
 
-`module/chargesend/status.rs` reserves twenty columns at the right of the
-Working row for the active turn's reasoning label, plus a three-column separator.
-The working controls remain left-aligned. Background activity truncates before
-the dock and hook activity can overflow to its usual details row. When the
-core controls cannot fit alongside the dock, the label hides without adding a
+`module/chargesend/status.rs` appends the active turn's reasoning label directly
+after the Working timer/interrupt controls, before optional background activity.
+The working controls remain left-aligned. Background activity truncates after
+the label and hook activity can overflow to its usual details row. When the
+core controls and label cannot fit together, the label hides without adding a
 row. Accepted new submissions capture their effective request effort; busy
 steering and queueing leave the active value unchanged. Turn start restores
 the label after status-row recreation, and completion/finalization clears it

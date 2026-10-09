@@ -1,42 +1,42 @@
 {
   "product": "ChargeSend",
   "version": "0.1.0",
-  "date": "2026-10-08",
+  "date": "2026-10-09",
   "platform": "Ubuntu 26.04, x86_64 Linux",
   "releases": {
     "rust-v0.161.0": {
       "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
-      "patch_fingerprint": "f22c4841c852bcf129ce5acaade733b90689d73e49c2f82fbe30e17772dd4560",
-      "binary_sha256": "2074792075261fcaa7c650651748cb19bac9549ca2bc25914958e831099a0cc5",
+      "patch_fingerprint": "a697da327d4f3f2ca82d7cdc7cc846a15da7f7cb13e3da6d705077f862803f98",
+      "binary_sha256": "af9d8dc0f9dfbe693997e00b39841164aea59f4783508ce9979b7797180138d3",
       "bundle": "dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 38,
+        "chargesend": 40,
         "composer": 396,
         "plan_mode": 63,
         "event_stream": 10,
         "working_status": 10
       },
-      "total_rust_tests": 517,
-      "clippy": "previous revision passed; not rerun for working-dock change",
+      "total_rust_tests": 519,
+      "clippy": "previous revision passed; not rerun for inline working indicator",
       "code_mode_host_sha256": "e87096087c02aa6ab90a5a85031659665aa0bf3ee20c07ca0b8ab701c83fcd5b",
       "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     },
     "rust-v0.160.0": {
       "upstream_commit": "a956835d020762cb2b570053af06f643a11c0ecc",
-      "patch_fingerprint": "6e891f8647db4ddd0e395cb5d13a8f81a481d082a7e4bb7a9020a3485b91ffe8",
-      "binary_sha256": "d63390f572e853fbfd4e0f5edfab480d5636be5d3a66cf5085ef4f322724ce88",
+      "patch_fingerprint": "e9b351fd6d6616c38f03700c596823d3a4b0b9a92f4b7c9cb7b6f510087fa2b7",
+      "binary_sha256": "ba2f67dc0553d99cec0ba7828c589ca27ad25f5c6112eb75d264155e5a0ee5b6",
       "bundle": "dist/chargesend-0.1.0-codex-0.160.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
-        "chargesend": 38,
+        "chargesend": 40,
         "composer": 387,
         "plan_mode": 63,
         "event_stream": 10,
         "working_status": 10
       },
-      "total_rust_tests": 508,
-      "clippy": "previous revision passed; not rerun for working-dock change",
+      "total_rust_tests": 510,
+      "clippy": "previous revision passed; not rerun for inline working indicator",
       "code_mode_host_sha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
       "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
     }
@@ -44,6 +44,6 @@
   "python_workflow_tests": 21,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
-  "github_actions": "prepared locally, not run",
+  "github_actions": "not run during this local verification",
   "live_inference": "not used"
 }

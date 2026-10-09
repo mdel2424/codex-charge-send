@@ -687,10 +687,10 @@
  //! these pieces on one line avoids vertical layout churn in the bottom pane.
  //! Hook activity uses the remaining space or its own line on overflow, so it
 -//! never displaces background-process controls.
-+//! never displaces background-process controls. ChargeSend docks active-turn
-+//! reasoning in a fixed-width right-hand slot when the core controls fit; it
-+//! hides the slot on narrow rows rather than wrapping or shifting the controls.
-
++//! never displaces background-process controls. ChargeSend appends active-turn
++//! reasoning immediately after the elapsed/interrupt segment, before optional
++//! activity. It hides the suffix when the core controls and label cannot fit.
+ 
  use std::time::Duration;
  use std::time::Instant;
 @@ -60,6 +63,7 @@
@@ -712,7 +712,7 @@
 @@ -153,6 +158,10 @@
              .filter(|message| !message.is_empty());
      }
-
+ 
 +    pub(crate) fn update_reasoning_label(&mut self, label: Option<String>) {
 +        self.reasoning_label = label;
 +    }
@@ -720,41 +720,32 @@
      pub(crate) fn update_hook_status_message(&mut self, message: Option<String>) {
          self.hook_status_message = message;
      }
-@@ -258,6 +267,11 @@
+@@ -258,14 +267,19 @@
          } else {
              spans.push(format!("({pretty_elapsed})").dim());
          }
-+        let content_width = crate::chargesend::status::content_width(
-+            width,
-+            line_width(&Line::from(spans.clone())),
+-        if let Some(message) = &row.inline_message {
++        let mut header = crate::chargesend::status::append_reasoning(
++            Line::from(spans),
 +            row.reasoning_label.as_deref(),
++            width,
 +        );
-         if let Some(message) = &row.inline_message {
++        if let Some(message) = &row.inline_message
++            && line_width(&header) + display_width(" · ") < usize::from(width)
++        {
              // Keep optional context after elapsed/interrupt text so that core
              // interrupt affordances stay in a fixed visual location.
-@@ -269,7 +283,7 @@
+-            spans.push(" · ".dim());
+-            spans.push(message.clone().dim());
+-        }
+-
+-        let mut header = Line::from(spans);
++            header.spans.extend([" · ".dim(), message.clone().dim()]);
++        }
++
          let mut hook_overflow = None;
          if let Some(message) = &row.hook_status_message {
              if line_width(&header) + display_width(" · ") + display_width(message)
--                <= usize::from(width)
-+                <= usize::from(content_width)
-             {
-                 header.spans.extend([" · ".dim(), message.clone().dim()]);
-             } else {
-@@ -280,9 +294,11 @@
-             }
-         }
-         let mut lines = Vec::new();
--        lines.push(truncate_line_with_ellipsis_if_overflow(
-+        lines.push(crate::chargesend::status::dock_reasoning(
-             header,
--            usize::from(width),
-+            row.reasoning_label.as_deref(),
-+            width,
-+            content_width,
-         ));
-         lines.extend(hook_overflow);
-         lines.extend(row.wrapped_details_lines(width));
 --- a/codex-rs/tui/src/terminal_probe.rs
 +++ b/codex-rs/tui/src/terminal_probe.rs
 @@ -1,3 +1,4 @@

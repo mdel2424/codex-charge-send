@@ -10,16 +10,16 @@ Rust toolchain: `1.95.0 (59807616e 2026-04-14)`.
 | Python patch/build/install workflow tests | 21 passed, including command mapping/restoration, updating a running executable, runtime helper packaging/version checks, and refusing changed inputs during compilation |
 | Complete pinned 0.161.0 source / patch application | Obtained; all 22 integration edits rebased; full patch check passed |
 | Actual 0.161.0 CLI compilation | Passed; versioned native development bundle produced and installed as `local/bin/chargesend` |
-| 0.161.0 ChargeSend tests | 38 passed: controller 9, capability 1, bar/gradient 2, working dock 4, app latch 1, composer/request integration 21; queued-turn effort and dock position verified |
+| 0.161.0 ChargeSend tests | 40 passed: controller 9, capability 1, bar/gradient 2, working indicator 6, app latch 1, composer/request integration 21; queued-turn effort, inline placement, tight-width rendering and UI snapshots verified |
 | 0.161.0 upstream regressions | 479 passed: composer 396, Plan mode 63, event stream 10, working status 10 |
-| Second release portability | Exact 0.160.0 source patched and native CLI built; 508 Rust tests passed: ChargeSend 38, composer 387, Plan mode 63, event stream 10, working status 10 |
-| Scoped Clippy on 0.161.0 | Previous revision passed; not rerun for the working-dock change |
-| Scoped Clippy on 0.160.0 | Previous revision passed; not rerun for the working-dock change |
+| Second release portability | Exact 0.160.0 source patched and native CLI built; 510 Rust tests passed: ChargeSend 40, composer 387, Plan mode 63, event stream 10, working status 10 |
+| Scoped Clippy on 0.161.0 | Previous revision passed; not rerun for the inline working indicator |
+| Scoped Clippy on 0.160.0 | Previous revision passed; not rerun for the inline working indicator |
 | Physical Kitty keyboard protocol | Passed in Kitty 0.45.0: flags 15, matching tap/hold releases, 101 repeats |
 | Basic physical 0.161.0 composer UI | Passed: bar ascent/descent, Escape retains draft, release after cancellation does not submit |
 | Full physical composer UI checklist | Remaining checks pending |
 | Native launcher / installation / removal | Version and help passed; actual native bundle installation/removal passed; stock Codex preserved |
-| GitHub Actions | Prepared locally; not run or published |
+| GitHub Actions | Not run as part of this local verification |
 
 The controller tests cover configured tap/reset defaults, initial rise, holding, descending and cycle
 boundaries, repeats, exactly-once release, cancellation, context invalidation,
@@ -38,7 +38,7 @@ operations with a mock sticky backend. They require no live
 model inference. Assertions cover per-request effort, restored defaults, Plan
 precedence, image preparation/cancellation, paste, menus, newlines, busy input,
 Extra High tap submission, supported-default fallback, gradient endpoints, fixed charge-bar position, active-turn reasoning labels,
-queued-turn transitions, restored labels, dock position, Unicode clipping,
+queued-turn transitions, restored labels, inline placement, Unicode clipping,
 advertised Max availability, Ultra exclusion, and inline rendering snapshots at 8, 24, and 80 columns.
 The sticky-backend mock verifies the selected effort and the next prompt's
 intended effort, and rejects an immediate settings reset that would disturb
@@ -90,6 +90,8 @@ request explicitly restores the current widget's intended effort. Restart/resume
 and multiple-client synchronization need further verification. See
 [architecture.md](architecture.md) for this limitation and notification matching.
 
-The working-dock revision passes automated tests. Physical Kitty checks for
-the dock, fixed bar position, colors and starting effort remain pending; the
-older UI evidence does not verify these new behaviors.
+The inline working-indicator revision passes 519 Rust tests on 0.161.0 and
+510 on 0.160.0, with native CLI builds for both. The 0.161.0 bundle is installed
+in `local/` and used by the existing `codex` mapping. Physical Kitty checks for
+the reasoning suffix, fixed bar position, colors and starting effort remain
+pending; the older UI evidence does not verify these new behaviors.

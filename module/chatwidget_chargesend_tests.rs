@@ -775,16 +775,16 @@ async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
         chat.chargesend.active_effort,
         Some(ReasoningEffortConfig::Max)
     );
-    assert!(working_text(&chat).contains("Max Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · Max Reasoning"));
     draft(&mut chat, "queued follow-up");
     chat.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
     assert!(chat.input_queue.has_queued_follow_up_messages());
     assert_no_submit_op(&mut op_rx);
-    assert!(working_text(&chat).contains("Max Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · Max Reasoning"));
     // Streaming can temporarily remove and recreate the status row.
     chat.bottom_pane.hide_status_indicator();
     chat.bottom_pane.ensure_status_indicator();
-    assert!(working_text(&chat).contains("Max Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · Max Reasoning"));
     chat.on_task_complete(None, None, false);
     assert_effort(
         &next_submit_op(&mut op_rx),
@@ -792,7 +792,7 @@ async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
         ModeKind::Default,
     );
     chat.on_task_started();
-    assert!(working_text(&chat).contains("xHigh Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · xHigh Reasoning"));
     assert_eq!(
         chat.chargesend.active_effort,
         Some(ReasoningEffortConfig::XHigh)
@@ -806,7 +806,7 @@ async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
 async fn chargesend_working_label_restores_effort_and_ignores_busy_steering() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
     chat.on_task_started();
-    assert!(working_text(&chat).contains("High Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · High Reasoning"));
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::Medium));
     draft(&mut chat, "steer this turn");
     enter(&mut chat, KeyEventKind::Press);
@@ -815,5 +815,5 @@ async fn chargesend_working_label_restores_effort_and_ignores_busy_steering() {
         chat.chargesend.active_effort,
         Some(ReasoningEffortConfig::High)
     );
-    assert!(working_text(&chat).contains("High Reasoning"));
+    assert!(working_text(&chat).contains("to interrupt) · High Reasoning"));
 }
