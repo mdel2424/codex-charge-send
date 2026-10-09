@@ -6,6 +6,8 @@ ChargeSend is an unofficial modification of Codex CLI that lets you choose
 reasoning effort by holding Enter before sending a prompt. It keeps the Codex
 terminal interface, authentication, settings, and agent functionality.
 
+![Illustrated ChargeSend demo: hold Enter to raise reasoning effort, keep holding to descend, then release to submit at High; the Working line shows High Reasoning.](assets/chargesend-demo.gif)
+
 ## Implementation
 
 - `patches/` contains source patches for Codex 0.161.0 and 0.160.0.
