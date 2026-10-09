@@ -34,7 +34,6 @@ struct ExpectedSettings {
 pub(super) struct ChargeSend {
     controller: Controller<Context, ReasoningEffortConfig>,
     pub(super) terminal_available: bool,
-    default_effort: ReasoningEffortConfig,
     active_effort: Option<ReasoningEffortConfig>,
     announced: bool,
     pub(super) has_charged: bool,
@@ -49,23 +48,10 @@ impl Default for ChargeSend {
             // Existing upstream fixtures should not gain environment-specific
             // history. ChargeSend tests explicitly enable the notice when needed.
             announced: cfg!(test),
-            default_effort: configured_default(
-                std::env::var("CHARGESEND_DEFAULT_EFFORT").ok().as_deref(),
-            ),
             has_charged: false,
             active_effort: None,
             echoes: VecDeque::new(),
         }
-    }
-}
-
-fn configured_default(value: Option<&str>) -> ReasoningEffortConfig {
-    match value.unwrap_or("xhigh") {
-        "low" => ReasoningEffortConfig::Low,
-        "medium" => ReasoningEffortConfig::Medium,
-        "high" => ReasoningEffortConfig::High,
-        "max" => ReasoningEffortConfig::Max,
-        _ => ReasoningEffortConfig::XHigh,
     }
 }
 
@@ -82,6 +68,7 @@ fn starting_effort(
         ReasoningEffortConfig::High => 3,
         ReasoningEffortConfig::XHigh => 4,
         ReasoningEffortConfig::Max => 5,
+        ReasoningEffortConfig::Ultra => 6,
         _ => 0,
     };
     choices
@@ -133,14 +120,20 @@ impl ChatWidget {
         if choices.is_empty() {
             return None;
         }
+        let mode = self.effective_collaboration_mode();
+        let selected = mode.reasoning_effort().or_else(|| {
+            self.current_model_preset()
+                .map(|preset| preset.default_reasoning_effort)
+        })?;
+        let start = starting_effort(&choices, &selected);
         Some((
             Context {
                 thread: self.thread_id?,
-                mode: self.effective_collaboration_mode(),
+                mode,
                 draft: self.bottom_pane.composer_text(),
             },
-            choices.clone(),
-            starting_effort(&choices, &self.chargesend.default_effort),
+            choices,
+            start,
         ))
     }
 

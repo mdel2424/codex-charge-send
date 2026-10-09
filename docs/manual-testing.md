@@ -46,10 +46,13 @@ ascent/descent and Escape cancellation followed by Enter release in the compiled
 Physical submissions, attachment cancellation, other transitions, and the
 remaining checks in steps 2–8 are outstanding.
 
-Default and color checks: with GPT-6.1 Sol, tap Enter and verify Extra High.
-On each fresh hold, verify Extra High and a partially filled orange bar, Max
+Selection and color checks: choose Low with `/model`, then tap Enter and verify
+Low on the Working line. Choose High in the same session and verify the next
+tap and initial bar use High. With a model offering Low through Max, verify Max
 at two seconds (red), Low at four seconds (green), then Max again at six.
-Set `CHARGESEND_DEFAULT_EFFORT=high` and repeat to verify the starting tier.
+Repeat in Plan mode with a distinct Plan reasoning effort. When the selected
+effort is unset, verify the active model's default is used. Cancel a hold, change
+the model/effort, and verify its next hold starts at the new selection.
 
 Working-row indicator: submit at Max and verify `· Max Reasoning` directly after
 the Working timer/interrupt hint, before any background-process summary.

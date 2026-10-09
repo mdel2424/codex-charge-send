@@ -21,8 +21,7 @@ async fn fixture() -> Fixture {
     let (mut chat, _sender, rx, op_rx) = make_chatwidget_manual_with_sender().await;
     chat.thread_id = Some(ThreadId::new());
     chat.chargesend.terminal_available = true;
-    chat.chargesend.default_effort = ReasoningEffortConfig::Low;
-    chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::Low));
     catalog(
         &mut chat,
         vec![
@@ -248,6 +247,7 @@ async fn chargesend_focus_thread_model_and_settings_invalidate() {
 #[tokio::test]
 async fn chargesend_unsupported_terminal_preserves_normal_press_submission() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
     chat.chargesend.terminal_available = false;
     enter(&mut chat, KeyEventKind::Press);
     assert!(!chat.chargesend_active());
@@ -421,7 +421,7 @@ async fn chargesend_model_specific_tiers_include_max_and_exclude_ultra() {
 #[tokio::test(start_paused = true)]
 async fn chargesend_peak_submits_max_without_changing_default_effort() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
-    chat.chargesend.default_effort = ReasoningEffortConfig::XHigh;
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::XHigh));
     catalog(
         &mut chat,
         vec![
@@ -446,10 +446,13 @@ async fn chargesend_peak_submits_max_without_changing_default_effort() {
     assert_eq!(chat.effective_collaboration_mode(), intended);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn chargesend_followup_explicitly_restores_intended_effort_and_echoes() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
     enter(&mut chat, KeyEventKind::Press);
+    tokio::time::advance(Duration::from_secs(4)).await;
+    chat.paint_chargesend();
     enter(&mut chat, KeyEventKind::Release);
     let charged = next_submit_op(&mut op_rx);
     let Op::UserTurn {
@@ -501,6 +504,11 @@ async fn chargesend_unset_default_and_plan_override_are_consistent() {
     chat.set_reasoning_effort(None);
     enter(&mut chat, KeyEventKind::Press);
     enter(&mut chat, KeyEventKind::Release);
+    assert_effort(
+        &next_submit_op(&mut op_rx),
+        ReasoningEffortConfig::Medium,
+        ModeKind::Default,
+    );
     let mut backend = StickyBackend::default();
     backend.drain(&mut op_rx);
     reset_idle(&mut chat);
@@ -527,7 +535,7 @@ async fn chargesend_unset_default_and_plan_override_are_consistent() {
     enter(&mut chat, KeyEventKind::Release);
     assert_effort(
         &next_submit_op(&mut op_rx),
-        ReasoningEffortConfig::Low,
+        ReasoningEffortConfig::High,
         ModeKind::Plan,
     );
     assert_eq!(
@@ -687,7 +695,7 @@ async fn chargesend_pending_images_restore_on_mode_change() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn chargesend_xhigh_tap_sends_configured_default_without_persisting() {
+async fn chargesend_tap_and_initial_bar_follow_selected_effort_between_turns() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
     catalog(
         &mut chat,
@@ -699,40 +707,84 @@ async fn chargesend_xhigh_tap_sends_configured_default_without_persisting() {
             ReasoningEffortConfig::Max,
         ],
     );
-    chat.chargesend.default_effort = configured_default(None);
-    let intended = chat.effective_collaboration_mode();
-    enter(&mut chat, KeyEventKind::Press);
-    chat.paint_chargesend();
-    tokio::time::advance(Duration::from_millis(100)).await;
-    enter(&mut chat, KeyEventKind::Release);
-    assert_effort(
-        &next_submit_op(&mut op_rx),
+    let config_file = chat.config.codex_home.join("config.toml");
+    let original_file = std::fs::read(&config_file).ok();
+    let mut bars = Vec::new();
+    for selected in [
+        ReasoningEffortConfig::Low,
+        ReasoningEffortConfig::High,
         ReasoningEffortConfig::XHigh,
-        ModeKind::Default,
-    );
-    assert_eq!(chat.effective_collaboration_mode(), intended);
+        ReasoningEffortConfig::Medium,
+        ReasoningEffortConfig::Max,
+    ] {
+        reset_idle(&mut chat);
+        draft(&mut chat, "next prompt");
+        chat.set_reasoning_effort(Some(selected.clone()));
+        let intended = chat.effective_collaboration_mode();
+        enter(&mut chat, KeyEventKind::Press);
+        chat.paint_chargesend();
+        let width = 100;
+        let area = ratatui::layout::Rect::new(0, 0, width, chat.bottom_pane.desired_height(width));
+        let mut buffer = ratatui::buffer::Buffer::empty(area);
+        chat.bottom_pane.render(area, &mut buffer);
+        let footer = buffer
+            .content
+            .chunks(usize::from(width))
+            .find_map(|row| {
+                let line: String = row.iter().map(ratatui::buffer::Cell::symbol).collect();
+                line.contains("release Enter to send")
+                    .then(|| line.trim_end().to_owned())
+            })
+            .expect("charge footer is rendered");
+        bars.push(format!("{selected}:\n{footer}"));
+        tokio::time::advance(Duration::from_millis(100)).await;
+        enter(&mut chat, KeyEventKind::Release);
+        assert_effort(&next_submit_op(&mut op_rx), selected, ModeKind::Default);
+        assert_eq!(chat.effective_collaboration_mode(), intended);
+        assert_eq!(std::fs::read(&config_file).ok(), original_file);
+    }
+    insta::assert_snapshot!(bars.join("\n\n"), @"
+    low:
+      Low        [------------] ^ · release Enter to send · Esc cancels
+
+    high:
+      High       [======------] ^ · release Enter to send · Esc cancels
+
+    xhigh:
+      Extra high [=========---] ^ · release Enter to send · Esc cancels
+
+    medium:
+      Medium     [===---------] ^ · release Enter to send · Esc cancels
+
+    max:
+      Max        [============] ^ · release Enter to send · Esc cancels
+    ");
 }
 
-#[test]
-fn chargesend_configured_default_and_supported_fallback() {
-    assert_eq!(configured_default(None), ReasoningEffortConfig::XHigh);
-    assert_eq!(configured_default(Some("max")), ReasoningEffortConfig::Max);
-    assert_eq!(configured_default(Some("low")), ReasoningEffortConfig::Low);
-    assert_eq!(
-        configured_default(Some("invalid")),
-        ReasoningEffortConfig::XHigh
+#[tokio::test]
+async fn chargesend_selected_effort_uses_only_available_tiers() {
+    let (mut chat, _rx, mut op_rx) = fixture().await;
+    catalog(
+        &mut chat,
+        vec![
+            ReasoningEffortConfig::Low,
+            ReasoningEffortConfig::High,
+            ReasoningEffortConfig::Max,
+        ],
     );
-    assert_eq!(
-        starting_effort(
-            &[
-                ReasoningEffortConfig::Low,
-                ReasoningEffortConfig::High,
-                ReasoningEffortConfig::Max
-            ],
-            &ReasoningEffortConfig::XHigh
-        ),
-        ReasoningEffortConfig::High
-    );
+    for (selected, expected) in [
+        (ReasoningEffortConfig::XHigh, ReasoningEffortConfig::High),
+        (ReasoningEffortConfig::Ultra, ReasoningEffortConfig::Max),
+    ] {
+        reset_idle(&mut chat);
+        draft(&mut chat, "supported fallback");
+        chat.set_reasoning_effort(Some(selected));
+        let intended = chat.effective_collaboration_mode();
+        enter(&mut chat, KeyEventKind::Press);
+        enter(&mut chat, KeyEventKind::Release);
+        assert_effort(&next_submit_op(&mut op_rx), expected, ModeKind::Default);
+        assert_eq!(chat.effective_collaboration_mode(), intended);
+    }
 }
 
 fn working_text(chat: &ChatWidget) -> String {
@@ -805,6 +857,7 @@ async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
 #[tokio::test]
 async fn chargesend_working_label_restores_effort_and_ignores_busy_steering() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
+    chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
     chat.on_task_started();
     assert!(working_text(&chat).contains("to interrupt) · High Reasoning"));
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::Medium));

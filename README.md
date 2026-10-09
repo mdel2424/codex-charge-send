@@ -32,7 +32,7 @@ cycle. Continuous charge position is rounded to the nearest available tier.
 Defaults are 2000 ms per direction, a 150 ms tap threshold, and a 33 ms redraw
 interval, loaded from `CHARGESEND_HALF_CYCLE_MS`, `CHARGESEND_TAP_MS`, and
 `CHARGESEND_FRAME_MS`. Codex's existing `FrameRequester` schedules redraws.
-Repeats are consumed; release submits the last painted effort, or the configured
+Repeats are consumed; release submits the last painted effort, or the selected
 starting effort for a tap, so crossing a timing boundary between frames cannot
 send an unseen tier.
 
@@ -49,9 +49,11 @@ input continue through their existing handlers.
 
 **Request settings.** Effort choices come from the active model's
 `supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
-is included; an unavailable starting tier falls back to the nearest supported
-lower tier, or the first offered tier. A `PromptEffort` envelope carries the
-thread, collaboration mode, and selected effort through asynchronous image
+is included. Each new charge starts at the active collaboration mode's selected
+effort, including the Plan-mode override. If the selection is unset, it uses the
+active model's advertised default. An unavailable tier falls back to the nearest
+supported lower tier, or the first offered tier. A `PromptEffort` envelope carries
+the thread, collaboration mode, and selected effort through asynchronous image
 preparation, with context validation before submission. The effort is applied to
 both `Op::UserTurn.effort` and its collaboration-mode settings so Plan mode uses
 the same selection. After a charged submission, subsequent requests explicitly
@@ -116,7 +118,7 @@ Type a prompt while the agent is idle:
 
 | Action | Behavior |
 | --- | --- |
-| Tap Enter | Send at the configured starting effort: Extra High by default, when supported. |
+| Tap Enter | Send at the reasoning effort currently selected for the active model and mode. |
 | Hold Enter | Rise to the highest offered tier over two seconds, descend to the lowest over two seconds, then repeat. |
 | Release Enter | Send once at the displayed effort. |
 | Press Escape while holding | Cancel and retain the draft and attachments. Release Enter before trying again. |
@@ -131,11 +133,16 @@ While a task runs, its submitted effort appears after the timer and cancel hint:
 Working (1m 34s • esc to interrupt) · xHigh Reasoning
 ```
 
-Set the starting effort and charge timing when launching:
+Choose the model and reasoning effort with Codex's `/model` picker. Select Low
+to start and tap at Low, or select High to start and tap at High. If the effort is
+unset, the model's default is used. Holding Enter starts at that selection and
+cycles through the available tiers; releasing sends at the displayed tier.
+
+Adjust charge timing when launching:
 
 ```bash
-CHARGESEND_DEFAULT_EFFORT=high CHARGESEND_HALF_CYCLE_MS=1000 codex
+CHARGESEND_HALF_CYCLE_MS=1000 codex
 ```
 
-Starting-effort values are `low`, `medium`, `high`, `xhigh`, and `max`, limited to
-what the model supports. The example uses High and one second per direction.
+The example uses one second per direction. `CHARGESEND_DEFAULT_EFFORT` is no
+longer used; the selected reasoning effort determines the starting tier.

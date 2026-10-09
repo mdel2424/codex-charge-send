@@ -116,13 +116,15 @@ keeps running. Exit and resume it to load the rebuilt interface.
 
 ## Timing options
 
-Set these environment variables before launching ChargeSend:
+The starting tier follows the reasoning effort selected in Codex's `/model`
+picker and the active collaboration mode. When unset, it follows the active
+model's advertised default. `CHARGESEND_DEFAULT_EFFORT` is no longer read.
+Set these timing environment variables before launching ChargeSend:
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
-| `CHARGESEND_DEFAULT_EFFORT` | `xhigh` | Tap and initial charge effort: low, medium, high, xhigh, max. Invalid values use xhigh; unsupported tiers use the nearest supported lower tier. |
 | `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of initial default-to-peak rise and each subsequent full ascent or descent; 250–60000 ms. |
-| `CHARGESEND_TAP_MS` | `150` | Tap always selects the configured starting effort; less than half the ascent duration. |
+| `CHARGESEND_TAP_MS` | `150` | Tap selects the current reasoning effort resolved at the initial press; less than half the ascent duration. |
 | `CHARGESEND_FRAME_MS` | `33` | Redraw interval; 10–100 ms. |
 
 For example, in Kitty with the project-local installation:

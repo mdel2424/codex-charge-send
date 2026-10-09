@@ -18,8 +18,11 @@ synthetic ordinary Enter reuses composer validation, paste expansion, mention
 resolution, and attachment draining. The bar occupies the existing measured
 composer footer. `module/chargesend/bar.rs` renders styled spans with a
 green–yellow–red gradient and a label colored by charge position.
-`CHARGESEND_DEFAULT_EFFORT` defaults to xhigh; the model-specific starting
-tier is resolved before charging. Tap and every new press use that tier.
+Every new press resolves its starting tier from the effective collaboration
+mode's selected effort, including the Plan-mode override. An unset selection
+uses the active model's advertised default. Unsupported or excluded tiers fall
+back to the nearest supported lower tier, or the first offered tier. A tap uses
+that resolved tier; changing the selected effort affects the next charge.
 The charge bar pads the effort name to a fixed ten-character field.
 
 `module/chargesend/status.rs` appends the active turn's reasoning label directly

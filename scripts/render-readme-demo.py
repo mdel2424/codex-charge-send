@@ -27,8 +27,8 @@ BORDER = "#2c3b52"
 
 
 def snapshot(elapsed_ms):
-    """Illustrate controller.rs with five offered tiers and an Extra High start."""
-    half, start, maximum = 2000, 3, len(EFFORTS) - 1
+    """Illustrate controller.rs with five offered tiers and Low selected."""
+    half, start, maximum = 2000, 0, len(EFFORTS) - 1
     if elapsed_ms < half:
         rise = 0 if elapsed_ms <= 150 else elapsed_ms
         position, descending = start * half + (maximum - start) * rise, False
@@ -71,7 +71,7 @@ def render(elapsed_ms, fonts):
 
     rectangle((48, 128, 1032, 410), TERMINAL, BORDER, 14)
     text(72, 145, "kitty / chargesend", "small_mono", MUTED)
-    text(805, 147, "UNOFFICIAL CODEX CLI", "tiny_mono", FAINT)
+    text(805, 147, "SELECTED EFFORT: LOW", "tiny_mono", FAINT)
     draw.line((49 * SCALE, 181 * SCALE, 1031 * SCALE, 181 * SCALE), fill=BORDER, width=SCALE)
 
     if not held:
@@ -111,7 +111,7 @@ def render(elapsed_ms, fonts):
         detail = "The Working line shows the effort used for this turn."
     elif elapsed_ms < 2000:
         headline = "Hold Enter to charge."
-        detail = "Start at Extra High and rise to the highest offered tier."
+        detail = "Start at your selected effort and rise to the highest tier."
     elif elapsed_ms < 4000:
         headline = "Keep holding. The bar comes back down."
         detail = "Each ascent or descent takes about two seconds."
@@ -120,7 +120,7 @@ def render(elapsed_ms, fonts):
         detail = "The cycle repeats for as long as Enter is held."
     text(218, 439, headline, "instruction")
     text(219, 478, detail, "detail", MUTED)
-    text(49, 538, "Illustrated demo · Kitty · Extra High start · Example model with Low–Max tiers", "note", FAINT)
+    text(49, 538, "Illustrated demo · Kitty · Low selected · Example model with Low–Max tiers", "note", FAINT)
     return canvas.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
 
 

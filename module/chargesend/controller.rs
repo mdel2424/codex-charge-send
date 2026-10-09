@@ -132,7 +132,7 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
             Input::EnterRelease if self.enter_down => {
                 self.enter_down = false;
                 self.active.take().map_or(Outcome::Consume, |charge| {
-                    // A short tap always selects the configured starting effort.
+                    // A short tap selects the effort resolved at the initial press.
                     let effort = if now.saturating_duration_since(charge.started) <= self.timing.tap
                     {
                         charge.choices[charge.start_index].clone()

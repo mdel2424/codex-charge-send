@@ -6,8 +6,8 @@
   "releases": {
     "rust-v0.161.0": {
       "upstream_commit": "979011409de0a60b52f179721948e65531d26144",
-      "patch_fingerprint": "a697da327d4f3f2ca82d7cdc7cc846a15da7f7cb13e3da6d705077f862803f98",
-      "binary_sha256": "af9d8dc0f9dfbe693997e00b39841164aea59f4783508ce9979b7797180138d3",
+      "patch_fingerprint": "e3bdf2eebd084681e30dd6569e6a6d6b21d6444eb70035280ae43de38430378c",
+      "binary_sha256": "766b66debbf3fbb3bf70a8a915f22a4a4d9f324b70e8c616b6b0964d588c9379",
       "bundle": "dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev",
       "native_compilation": "passed",
       "rust_tests": {
@@ -18,9 +18,10 @@
         "working_status": 10
       },
       "total_rust_tests": 519,
-      "clippy": "previous revision passed; not rerun for inline working indicator",
+      "clippy": "passed: cargo clippy --locked -p codex-tui --lib --tests; existing app-server warning only",
       "code_mode_host_sha256": "e87096087c02aa6ab90a5a85031659665aa0bf3ee20c07ca0b8ab701c83fcd5b",
-      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.161.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+      "revision": "selected reasoning effort determines charge start"
     },
     "rust-v0.160.0": {
       "upstream_commit": "a956835d020762cb2b570053af06f643a11c0ecc",
@@ -38,10 +39,11 @@
       "total_rust_tests": 510,
       "clippy": "previous revision passed; not rerun for inline working indicator",
       "code_mode_host_sha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
-      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host"
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+      "verification_scope": "Previous inline working-indicator revision; selected-effort start change not rerun locally"
     }
   },
-  "python_workflow_tests": 21,
+  "python_workflow_tests": 23,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "not run during this local verification",
