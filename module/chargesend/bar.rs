@@ -3,6 +3,9 @@
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
+// This animated meter intentionally interpolates RGB colors; ANSI colors
+// cannot preserve its continuous green-to-red gradient.
+#[allow(clippy::disallowed_methods)]
 fn color(position: u16) -> Color {
     let position = position.min(1000);
     let (from, to, offset) = if position <= 500 {
@@ -51,6 +54,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::disallowed_methods)] // Verify the intentional RGB gradient.
     fn chargesend_gradient_endpoints_and_intermediate_colors() {
         let low = status_line("Low", 0, false);
         let max = status_line("Max", 1000, true);

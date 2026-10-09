@@ -22,7 +22,7 @@ pub(crate) fn append_reasoning(
             header.spans.push(SEPARATOR.dim());
             header
                 .spans
-                .extend(label.spans.into_iter().map(|span| span.dim()));
+                .extend(label.spans.into_iter().map(Stylize::dim));
         }
     }
     header
