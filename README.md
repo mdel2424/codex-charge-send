@@ -10,18 +10,74 @@ terminal interface, authentication, settings, and agent functionality.
 
 ## Implementation
 
-- `patches/` contains source patches for Codex 0.161.0 and 0.160.0.
-- `module/chargesend/` contains the charge timer, terminal capability detection,
-  colored bar, and running-turn reasoning indicator.
-- `module/chatwidget_chargesend.rs` and `module/app_chargesend.rs` connect charging
-  to the composer, prompt submission, and turn lifecycle.
-- `scripts/chargesend.py` fetches a pinned upstream release, applies the patch
-  and modules, runs tests, and builds the CLI with its runtime helper.
+ChargeSend extends Codex's Rust `codex-tui` crate. The release-specific diffs in
+[patches/](patches/) integrate with keyboard setup, event dispatch, the composer,
+and prompt submission. [overlays.json](overlays.json) maps the dedicated Rust
+modules into the upstream checkout; those modules are shared by the 0.161.0 and
+0.160.0 patches.
 
-Charging uses Kitty's Enter press, repeat, and release events. A monotonic timer
-and Codex's redraw scheduler drive the bar. The selected effort travels with the
-submitted prompt, including Plan-mode settings, without writing to `config.toml`.
-Later prompts use their intended settings.
+**Keyboard negotiation.** [capability.rs](module/chargesend/capability.rs) enables
+charging only after the keyboard-mode request succeeds and Codex's terminal probe
+confirms both Kitty protocol flags: `REPORT_EVENT_TYPES` (`0x02`) and
+`REPORT_ALL_KEYS_AS_ESCAPE_CODES` (`0x08`). The probe runs before the asynchronous
+stdin reader takes ownership. Detection restricts charging to direct Kitty
+sessions; multiplexers, SSH, disabled keyboard enhancements, or an unverified
+response retain ordinary Enter handling.
+
+**Charge controller.** [controller.rs](module/chargesend/controller.rs) implements
+a generic `Controller<C, E>` that receives an eligible context and an ordered
+list of effort choices. It measures elapsed time with `std::time::Instant`, rises
+from the starting tier to the maximum, then repeats a descending/ascending
+cycle. Continuous charge position is rounded to the nearest available tier.
+Defaults are 2000 ms per direction, a 150 ms tap threshold, and a 33 ms redraw
+interval, loaded from `CHARGESEND_HALF_CYCLE_MS`, `CHARGESEND_TAP_MS`, and
+`CHARGESEND_FRAME_MS`. Codex's existing `FrameRequester` schedules redraws.
+Repeats are consumed; release submits the last painted effort, or the configured
+starting effort for a tap, so crossing a timing boundary between frames cannot
+send an unseen tier.
+
+**Input ownership.** [app_chargesend.rs](module/app_chargesend.rs) and
+[chatwidget_chargesend.rs](module/chatwidget_chargesend.rs) intercept plain Enter
+only in a focused, nonempty, eligible composer while the agent is idle. Native
+paste classification runs first. Release reuses the normal composer submission
+path, including mentions and attachments. Escape, focus loss, overlays, and
+changes to the thread, draft, collaboration settings, or effort choices cancel
+the charge. An application-level Enter-down latch survives widget replacement
+and consumes repeats until release, preventing a cancelled hold from submitting
+a different draft. Menus, slash commands, newline bindings, steering, and queued
+input continue through their existing handlers.
+
+**Request settings.** Effort choices come from the active model's
+`supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
+is included; an unavailable starting tier falls back to the nearest supported
+lower tier, or the first offered tier. A `PromptEffort` envelope carries the
+thread, collaboration mode, and selected effort through asynchronous image
+preparation, with context validation before submission. The effort is applied to
+both `Op::UserTurn.effort` and its collaboration-mode settings so Plan mode uses
+the same selection. After a charged submission, subsequent requests explicitly
+carry their intended effort to reset sticky backend overrides. Matching settings
+echoes are normalized before updating the UI defaults. Charge selections remain
+in memory and do not write to `config.toml`.
+
+**Rendering.** [bar.rs](module/chargesend/bar.rs) draws a 12-cell RGB
+green-to-yellow-to-red meter in the composer's measured footer space.
+[status.rs](module/chargesend/status.rs) appends the submitted turn's effort after
+the Working timer and interrupt hint. That label tracks the active request;
+steering or preparing a queued prompt does not replace it. Width checks preserve
+the timer and controls by hiding the suffix when it cannot fit.
+
+**Build and verification.** [chargesend.py](scripts/chargesend.py) verifies the
+release tag's pinned commit, checks the patch before applying it, and records
+source and patch fingerprints. It aligns only local workspace versions in
+`Cargo.lock`, preserving third-party pins, and builds with `--locked`. The bundle
+contains the native CLI and a matching `codex-code-mode-host`, reused from an
+installed official package of the same version or compiled from source using
+Codex's checksum-verified V8 archive and bindings. Its manifest records the
+baseline, toolchain, fingerprints, and executable checksums. Tests exercise the
+real composer and submission code through a mock operation receiver and a
+backend that simulates sticky effort settings. GitHub Actions applies, tests,
+lints, and builds both supported releases, then checks launcher installation and
+removal.
 
 ## Setup
 
