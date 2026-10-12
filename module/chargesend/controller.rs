@@ -183,23 +183,28 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
         let half = self.timing.half_cycle.as_nanos();
         let elapsed = now.saturating_duration_since(charge.started).as_nanos();
         let max_index = (charge.choices.len() - 1) as u128;
-        let (position, descending) = if elapsed < half {
-            let start = charge.start_index as u128;
-            let rise = if elapsed <= self.timing.tap.as_nanos() {
-                0
-            } else {
-                elapsed
-            };
-            (start * half + (max_index - start) * rise, false)
+        let peak = max_index * half;
+        let (position, descending) = if max_index == 0 {
+            (0, false)
         } else {
-            let phase = (elapsed - half) % (half * 2);
-            if phase < half {
-                (max_index * (half - phase), true)
+            // Offset the same triangle wave by the selected starting position.
+            // A partial first leg uses the same full-traversal speed.
+            // Reduce elapsed before multiplication to bound long-held charges.
+            let phase = (charge.start_index as u128 * half + max_index * (elapsed % (half * 2)))
+                % (peak * 2);
+            if phase < peak {
+                (phase, false)
             } else {
-                (max_index * (phase - half), false)
+                (peak * 2 - phase, true)
             }
         };
-        let index = ((position + half / 2) / half) as usize;
+        // Motion starts immediately. Keep the label consistent with tap release
+        // even when a short configured traversal crosses a tier during a tap.
+        let index = if elapsed <= self.timing.tap.as_nanos() {
+            charge.start_index
+        } else {
+            ((position + half / 2) / half) as usize
+        };
         let effort = charge.choices[index].clone();
         charge.painted = effort.clone();
         Some(Snapshot {
@@ -207,7 +212,7 @@ impl<C: PartialEq, E: Clone + PartialEq> Controller<C, E> {
             permille: if max_index == 0 {
                 1000
             } else {
-                (position * 1000 / (max_index * half)) as u16
+                (position * 1000 / peak) as u16
             },
             descending,
         })

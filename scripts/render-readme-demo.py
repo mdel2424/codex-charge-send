@@ -29,14 +29,11 @@ BORDER = "#2c3b52"
 def snapshot(elapsed_ms):
     """Illustrate controller.rs with five offered tiers and Low selected."""
     half, start, maximum = 2000, 0, len(EFFORTS) - 1
-    if elapsed_ms < half:
-        rise = 0 if elapsed_ms <= 150 else elapsed_ms
-        position, descending = start * half + (maximum - start) * rise, False
-    else:
-        phase = (elapsed_ms - half) % (half * 2)
-        descending = phase < half
-        position = maximum * (half - phase if descending else phase - half)
-    index = (position + half // 2) // half
+    peak = maximum * half
+    phase = (start * half + maximum * (elapsed_ms % (half * 2))) % (peak * 2)
+    descending = phase >= peak
+    position = peak * 2 - phase if descending else phase
+    index = start if elapsed_ms <= 150 else (position + half // 2) // half
     return EFFORTS[index], position * 1000 // (maximum * half), descending
 
 

@@ -435,7 +435,7 @@ async fn chargesend_peak_submits_max_without_changing_default_effort() {
     );
     let intended = chat.effective_collaboration_mode();
     enter(&mut chat, KeyEventKind::Press);
-    tokio::time::advance(Duration::from_secs(2)).await;
+    tokio::time::advance(Duration::from_millis(500)).await;
     chat.paint_chargesend();
     enter(&mut chat, KeyEventKind::Release);
     assert_effort(
@@ -451,7 +451,7 @@ async fn chargesend_followup_explicitly_restores_intended_effort_and_echoes() {
     let (mut chat, _rx, mut op_rx) = fixture().await;
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
     enter(&mut chat, KeyEventKind::Press);
-    tokio::time::advance(Duration::from_secs(4)).await;
+    tokio::time::advance(Duration::from_secs(2)).await;
     chat.paint_chargesend();
     enter(&mut chat, KeyEventKind::Release);
     let charged = next_submit_op(&mut op_rx);
@@ -757,7 +757,7 @@ async fn chargesend_tap_and_initial_bar_follow_selected_effort_between_turns() {
       Medium     [===---------] ^ · release Enter to send · Esc cancels
 
     max:
-      Max        [============] ^ · release Enter to send · Esc cancels
+      Max        [============] v · release Enter to send · Esc cancels
     ");
 }
 

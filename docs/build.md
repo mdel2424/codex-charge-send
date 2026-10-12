@@ -123,7 +123,7 @@ Set these timing environment variables before launching ChargeSend:
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
-| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of initial default-to-peak rise and each subsequent full ascent or descent; 250–60000 ms. |
+| `CHARGESEND_HALF_CYCLE_MS` | `2000` | Duration of a full-range ascent or descent; 250–60000 ms. Motion starts immediately at this speed, so a partial initial ascent takes proportionally less time. |
 | `CHARGESEND_TAP_MS` | `150` | Tap selects the current reasoning effort resolved at the initial press; less than half the ascent duration. |
 | `CHARGESEND_FRAME_MS` | `33` | Redraw interval; 10–100 ms. |
 

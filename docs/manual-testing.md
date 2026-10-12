@@ -48,8 +48,11 @@ remaining checks in steps 2–8 are outstanding.
 
 Selection and color checks: choose Low with `/model`, then tap Enter and verify
 Low on the Working line. Choose High in the same session and verify the next
-tap and initial bar use High. With a model offering Low through Max, verify Max
-at two seconds (red), Low at four seconds (green), then Max again at six.
+tap and initial bar use High. With five tiers from Low through Max, verify motion
+starts immediately at the same speed from every selection. Low reaches Max at
+two seconds (red), Low again at four seconds (green), then Max at six. Medium
+reaches Max at 1.5 seconds, High at one second, and xHigh at 0.5 seconds. Max
+starts descending immediately and reaches Low at two seconds.
 Repeat in Plan mode with a distinct Plan reasoning effort. When the selected
 effort is unset, verify the active model's default is used. Cancel a hold, change
 the model/effort, and verify its next hold starts at the new selection.

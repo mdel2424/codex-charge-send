@@ -1,9 +1,13 @@
 # Patch boundaries
 
-`module/chargesend/controller.rs` owns the monotonic timer (default-to-peak first, then a Low–Max triangle wave),
+`module/chargesend/controller.rs` owns the monotonic timer (a constant-speed triangle wave offset by the selected starting position),
 last-painted effort, and matching-key latch. It accepts eligible context/effort
 choices plus the resolved starting effort and produces Pass, Consume, or Submit. It does not know Codex models,
 terminal I/O, backend operations, or configuration. It has standalone Rust tests.
+Motion starts immediately at the full-range speed, including the partial first
+ascent. Starting at the maximum reverses immediately. The 150 ms tap window keeps
+the displayed effort at the selected starting tier while the bar moves; afterward,
+the nearest tier follows the continuous position. Release agrees with that label.
 
 `module/chargesend/capability.rs` requires both Enter-release flag bits and a
 successful request for direct Kitty. The existing keyboard stack push/pop/reset

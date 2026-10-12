@@ -27,9 +27,11 @@ response retain ordinary Enter handling.
 **Charge controller.** [controller.rs](module/chargesend/controller.rs) implements
 a generic `Controller<C, E>` that receives an eligible context and an ordered
 list of effort choices. It measures elapsed time with `std::time::Instant`, rises
-from the starting tier to the maximum, then repeats a descending/ascending
-cycle. Continuous charge position is rounded to the nearest available tier.
-Defaults are 2000 ms per direction, a 150 ms tap threshold, and a 33 ms redraw
+from the starting tier along a constant-speed descending/ascending triangle
+wave. Motion begins immediately; a higher starting tier reaches the peak sooner,
+and starting at the maximum descends immediately. Continuous charge position is
+rounded to the nearest available tier outside the tap window.
+Defaults are 2000 ms per full traversal, a 150 ms tap threshold, and a 33 ms redraw
 interval, loaded from `CHARGESEND_HALF_CYCLE_MS`, `CHARGESEND_TAP_MS`, and
 `CHARGESEND_FRAME_MS`. Codex's existing `FrameRequester` schedules redraws.
 Repeats are consumed; release submits the last painted effort, or the selected
@@ -119,7 +121,7 @@ Type a prompt while the agent is idle:
 | Action | Behavior |
 | --- | --- |
 | Tap Enter | Send at the reasoning effort currently selected for the active model and mode. |
-| Hold Enter | Rise to the highest offered tier over two seconds, descend to the lowest over two seconds, then repeat. |
+| Hold Enter | Move immediately at a constant speed: two seconds for the full range in either direction. Higher starting tiers reach the peak sooner; Max starts descending. |
 | Release Enter | Send once at the displayed effort. |
 | Press Escape while holding | Cancel and retain the draft and attachments. Release Enter before trying again. |
 

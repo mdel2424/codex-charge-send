@@ -203,12 +203,13 @@ fn chargesend_configured_start_peak_low_and_reset() {
     charge.handle(Input::EnterPress, Some(context()), now);
     for (ms, effort, permille, descending) in [
         (0, "xhigh", 750, false),
-        (150, "xhigh", 750, false),
-        (1000, "max", 875, false),
-        (2000, "max", 1000, true),
-        (3000, "high", 500, true),
-        (4000, "low", 0, false),
-        (6000, "max", 1000, true),
+        (150, "xhigh", 825, false),
+        (250, "max", 875, false),
+        (500, "max", 1000, true),
+        (1000, "xhigh", 750, true),
+        (1500, "high", 500, true),
+        (2500, "low", 0, false),
+        (4500, "max", 1000, true),
     ] {
         assert_eq!(
             charge.paint(now + Duration::from_millis(ms)),
@@ -223,7 +224,7 @@ fn chargesend_configured_start_peak_low_and_reset() {
         charge.handle(
             Input::EnterRelease,
             Some(context()),
-            now + Duration::from_secs(6)
+            now + Duration::from_millis(4500)
         ),
         Outcome::Submit("max")
     );
@@ -236,5 +237,59 @@ fn chargesend_configured_start_peak_low_and_reset() {
             next + Duration::from_millis(150)
         ),
         Outcome::Submit("xhigh")
+    );
+}
+
+#[test]
+fn chargesend_constant_speed_from_every_start_without_initial_pause() {
+    let now = Instant::now();
+    let choices = vec!["low", "medium", "high", "xhigh", "max"];
+    for (start, effort) in choices.iter().enumerate() {
+        let mut charge = Controller::new(Timing::default());
+        charge.handle(Input::EnterPress, Some((1, choices.clone(), *effort)), now);
+        for ms in [0, 100, 200] {
+            let snapshot = charge.paint(now + Duration::from_millis(ms)).unwrap();
+            let distance = ms / 2;
+            assert_eq!(
+                u64::from(snapshot.permille),
+                if start == 4 {
+                    1000 - distance
+                } else {
+                    start as u64 * 250 + distance
+                },
+                "start {effort}, elapsed {ms}ms"
+            );
+            assert_eq!(snapshot.descending, start == 4);
+        }
+        let first_peak = (4 - start) as u64 * 500;
+        let peak = charge
+            .paint(now + Duration::from_millis(first_peak))
+            .unwrap();
+        assert_eq!(peak.permille, 1000);
+        assert!(peak.descending);
+        let trough = charge
+            .paint(now + Duration::from_millis(first_peak + 2000))
+            .unwrap();
+        assert_eq!(trough.permille, 0);
+        assert!(!trough.descending);
+    }
+}
+
+#[test]
+fn chargesend_fast_motion_preserves_tap_label_and_submission() {
+    let now = Instant::now();
+    let mut charge = Controller::new(Timing::from_millis(500, 200, 20).unwrap());
+    let context = || (1, vec!["low", "medium", "high", "xhigh", "max"], "low");
+    charge.handle(Input::EnterPress, Some(context()), now);
+    let snapshot = charge.paint(now + Duration::from_millis(200)).unwrap();
+    assert_eq!(snapshot.permille, 400);
+    assert_eq!(snapshot.effort, "low");
+    assert_eq!(
+        charge.handle(
+            Input::EnterRelease,
+            Some(context()),
+            now + Duration::from_millis(200)
+        ),
+        Outcome::Submit("low")
     );
 }
