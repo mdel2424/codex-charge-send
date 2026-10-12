@@ -814,7 +814,7 @@ async fn chargesend_working_label_tracks_active_request_and_queued_next_turn() {
     );
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::XHigh));
     enter(&mut chat, KeyEventKind::Press);
-    tokio::time::advance(Duration::from_secs(2)).await;
+    tokio::time::advance(Duration::from_millis(500)).await;
     chat.paint_chargesend();
     enter(&mut chat, KeyEventKind::Release);
     assert_effort(

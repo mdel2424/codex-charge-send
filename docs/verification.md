@@ -5,15 +5,15 @@ Rust toolchain: `1.95.0 (59807616e 2026-04-14)`.
 
 | Check | Observed result |
 | --- | --- |
-| Standalone Rust controller tests | 9 passed, compiled with Rust 1.95.0 |
+| Standalone Rust controller tests | 11 passed, including immediate constant-speed motion from every starting tier, shortened first ascent, immediate Max descent, and tap-label consistency |
 | Standalone Rust capability tests | 1 passed, compiled with Rust 1.95.0 |
 | Python patch/build/install workflow tests | 23 passed, including command mapping/restoration, updating a running executable, runtime helper packaging/version checks, and refusing changed inputs during compilation |
 | Complete pinned 0.161.0 source / patch application | Obtained; all 22 integration edits rebased; full patch check passed |
-| Actual 0.161.0 CLI compilation | Passed for selected-effort starting behavior; versioned native development bundle rebuilt in `dist/`; installed commands need reinstalling |
-| 0.161.0 ChargeSend tests | 40 passed: controller 9, capability 1, bar/gradient 2, working indicator 6, app latch 1, composer/request integration 21; queued-turn effort, inline placement, tight-width rendering and UI snapshots verified |
+| Actual 0.161.0 CLI compilation | Passed for selected-effort start and constant-speed charging; native bundle rebuilt and installed in `local/`; existing `codex` mapping verified against current source and executable checksums |
+| 0.161.0 ChargeSend tests | 42 passed: controller 11, capability 1, bar/gradient 2, working indicator 6, app latch 1, composer/request integration 21; queued-turn effort, inline placement, tight-width rendering and UI snapshots verified |
 | 0.161.0 upstream regressions | 479 passed: composer 396, Plan mode 63, event stream 10, working status 10 |
 | Second release portability | Previous inline-indicator revision: exact 0.160.0 source patched and native CLI built; 510 Rust tests passed. Selected-effort start change not rerun locally; full source unavailable in this session |
-| Scoped Clippy on 0.161.0 | Passed for selected-effort starting behavior with `cargo clippy --locked -p codex-tui --lib --tests`; only the existing app-server warning |
+| Scoped Clippy on 0.161.0 | Passed for selected-effort start and constant-speed charging with `cargo clippy --locked -p codex-tui --lib --tests`; only the existing app-server warning |
 | Scoped Clippy on 0.160.0 | Previous revision passed; not rerun for the inline working indicator |
 | Physical Kitty keyboard protocol | Passed in Kitty 0.45.0: flags 15, matching tap/hold releases, 101 repeats |
 | Basic physical 0.161.0 composer UI | Passed: bar ascent/descent, Escape retains draft, release after cancellation does not submit |
@@ -107,3 +107,14 @@ regenerated with Low selected. The CI scoped Clippy command also passed.
 Physical Kitty checks for changing the selected
 effort between taps have not been repeated. The 0.160.0 results above are historical;
 the existing CI matrix still targets both releases.
+
+On 2026-10-12 the constant-speed revision passed 521 focused Rust tests and
+the scoped Clippy check on 0.161.0. The first leg now uses the same full-range
+speed as later traversals, with no initial motion pause. Starting at Max descends
+immediately. The tap window retains the selected label while the bar moves.
+Tests verify all starting tiers, turnarounds, tap consistency, and the submitted
+and queued-turn efforts. The native CLI and helper startup checks passed, then
+the new bundle was installed in `local/`. The existing `~/.local/bin/codex`
+mapping resolves to that launcher; installed fingerprints and executable/helper
+checksums match the current source. Running sessions must restart to load it.
+The physical constant-speed interaction has not been checked in Kitty.
