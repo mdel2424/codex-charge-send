@@ -1,5 +1,37 @@
 # Verification record
 
+Current default: **Codex 0.163.0**, ported and installed on 2026-10-17.
+The 0.161.0 bundle remains available for rollback. Earlier records below retain
+their original baseline and physical-test scope.
+
+| 0.163.0 check | Result |
+| --- | --- |
+| Exact source and patch | Pinned commit `83086188ae0614bd882818ff1aa23f3194962012`; clean patch application; third-party dependency pins unchanged |
+| Native CLI and runtime helper | CLI compiled with Rust 1.95.0; matching installed official 0.163.0 helper reused; version, help, fingerprints, and executable checksums passed |
+| ChargeSend and upstream regressions | 566 passed: ChargeSend 43, composer 397, Plan mode 61, event stream 10, Working status 10, activation guard 1, settings panel 19, app input 2, key chords 22, view-transition guard 1 |
+| Scoped Clippy and formatting | Passed; only existing upstream app-server `let_and_return` warning |
+| Python workflow tests | 24 passed |
+| Installed command | `~/.local/bin/codex` resolves to the project-local launcher and the 0.163.0 bundle; native version and checksums verified |
+| Rollback | Existing 0.161.0 installed and distribution bundles preserved; original binary checksum verified |
+| Physical Kitty / live inference | Not repeated on 0.163.0; no live inference used |
+| GitHub Actions | Matrix updated for 0.163.0, 0.161.0, and 0.160.0; remote CI not run during this local verification |
+
+The 0.163.0 patch hooks the production activation-key-aware ChatWidget entry point.
+Consumed key releases still retire settings-editor activation guards and notify
+covered views without dispatching another action. A new regression test checks
+this release path; upstream settings-editor chord handoff tests also pass.
+The charge controller, selected-effort starting behavior, immediate constant
+speed, and prompt-local settings envelope are unchanged.
+
+The first 521 tests ran through Cargo's focused lib-test filters. The additional
+45 input/settings tests ran directly from the same compiled test executable with
+upstream's 8 MiB test stack and workspace working directory. All filters are now
+part of `chargesend.py test/build`. The exact CI Clippy command was also rerun
+from the upstream workspace. Full workspace/Bazel tests were not run.
+[source-provenance-0.163.0.json](source-provenance-0.163.0.json) records the source
+commit; [build-results.json](build-results.json) records bundle identity and counts.
+See [build.md](build.md#revert-a-project-local-update) for rollback instructions.
+
 Development machine: Ubuntu 26.04. Installed stock baseline: `codex-cli 0.161.0`.
 Rust toolchain: `1.95.0 (59807616e 2026-04-14)`.
 

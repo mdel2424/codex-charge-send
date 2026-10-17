@@ -65,3 +65,8 @@ and Max: the working timer/interrupt hint and the charge bar's opening bracket
 should stay in the same columns. Resize narrower; the reasoning label should
 hide before it displaces the working controls, and reappear when widened.
 Check status recreation during tool activity and label removal on cancellation.
+
+For the 0.163.0 port, also open `/config`, hold/release Enter while opening a
+setting editor, then accept it with a fresh press. Check the Ctrl+X leader
+shortcuts and return to an idle draft. Automated settings-editor and chord tests
+pass; the physical keyboard checks on this baseline remain outstanding.

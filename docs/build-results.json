@@ -1,7 +1,7 @@
 {
   "product": "ChargeSend",
   "version": "0.1.0",
-  "date": "2026-10-12",
+  "date": "2026-10-17",
   "platform": "Ubuntu 26.04, x86_64 Linux",
   "releases": {
     "rust-v0.161.0": {
@@ -42,9 +42,36 @@
       "code_mode_host_sha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
       "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
       "verification_scope": "Previous inline working-indicator revision; selected-effort and constant-speed changes not rerun locally"
+    },
+    "rust-v0.163.0": {
+      "upstream_commit": "83086188ae0614bd882818ff1aa23f3194962012",
+      "patch_fingerprint": "c69a8586f446dba34129d80ba82e1961dbb15552cc2a6a1850759714057dfe9c",
+      "binary_sha256": "ea79f32de3c07f82913ca7824434395b9e46107cafd9080e40fe6fc5b60a6239",
+      "bundle": "dist/chargesend-0.1.0-codex-0.163.0-x86_64-unknown-linux-gnu-dev",
+      "native_compilation": "passed",
+      "rust_tests": {
+        "chargesend": 43,
+        "composer": 397,
+        "plan_mode": 61,
+        "event_stream": 10,
+        "working_status": 10,
+        "activation_key_guard": 1,
+        "config_panel": 19,
+        "app_input": 2,
+        "key_chords": 22,
+        "view_transition_guard": 1
+      },
+      "total_rust_tests": 566,
+      "clippy": "passed: cargo clippy --locked -p codex-tui --lib --tests; existing app-server let_and_return warning only",
+      "code_mode_host_sha256": "8724d73ec190536233ab4628d24a071bfbcf27e5124f08fe35129f26fe48b916",
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+      "revision": "0.163.0 port; settings-editor release notifications preserved; shared selected-effort and constant-speed controller unchanged",
+      "installation": "project-local installation updated; ~/.local/bin/codex resolves to local/bin/chargesend; 0.161.0 rollback bundle preserved",
+      "physical_keyboard_check": "not repeated on 0.163.0",
+      "verification_scope": "521 tests via Cargo lib-test filters; 45 additional upstream input/settings tests run directly from that same compiled test binary; all filters included in the build workflow"
     }
   },
-  "python_workflow_tests": 23,
+  "python_workflow_tests": 24,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "not run during this local verification",

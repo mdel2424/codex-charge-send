@@ -13,7 +13,7 @@ terminal interface, authentication, settings, and agent functionality.
 ChargeSend extends Codex's Rust `codex-tui` crate. The release-specific diffs in
 [patches/](patches/) integrate with keyboard setup, event dispatch, the composer,
 and prompt submission. [overlays.json](overlays.json) maps the dedicated Rust
-modules into the upstream checkout; those modules are shared by the 0.161.0 and
+modules into the upstream checkout; those modules are shared by the 0.163.0, 0.161.0, and
 0.160.0 patches.
 
 **Keyboard negotiation.** [capability.rs](module/chargesend/capability.rs) enables
@@ -26,9 +26,8 @@ response retain ordinary Enter handling.
 
 **Charge controller.** [controller.rs](module/chargesend/controller.rs) implements
 a generic `Controller<C, E>` that receives an eligible context and an ordered
-list of effort choices. It measures elapsed time with `std::time::Instant`, rises
-from the starting tier along a constant-speed descending/ascending triangle
-wave. Motion begins immediately; a higher starting tier reaches the peak sooner,
+list of effort choices. It measures elapsed time with `std::time::Instant` and
+advances from the starting tier along a constant-speed triangle wave. Motion begins immediately; a higher starting tier reaches the peak sooner,
 and starting at the maximum descends immediately. Continuous charge position is
 rounded to the nearest available tier outside the tap window.
 Defaults are 2000 ms per full traversal, a 150 ms tap threshold, and a 33 ms redraw
@@ -47,7 +46,9 @@ changes to the thread, draft, collaboration settings, or effort choices cancel
 the charge. An application-level Enter-down latch survives widget replacement
 and consumes repeats until release, preventing a cancelled hold from submitting
 a different draft. Menus, slash commands, newline bindings, steering, and queued
-input continue through their existing handlers.
+input continue through their existing handlers. On 0.163.0, consumed releases
+still notify settings-editor activation guards and covered views, without
+dispatching another menu action.
 
 **Request settings.** Effort choices come from the active model's
 `supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
@@ -80,7 +81,7 @@ Codex's checksum-verified V8 archive and bindings. Its manifest records the
 baseline, toolchain, fingerprints, and executable checksums. Tests exercise the
 real composer and submission code through a mock operation receiver and a
 backend that simulates sticky effort settings. GitHub Actions applies, tests,
-lints, and builds both supported releases, then checks launcher installation and
+lints, and builds the supported releases, then checks launcher installation and
 removal.
 
 ## Setup
@@ -94,9 +95,9 @@ From the repository directory:
 ```bash
 bash scripts/setup-ubuntu.sh
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.161.0
+python3 scripts/chargesend.py build --tag rust-v0.163.0
 python3 scripts/chargesend.py install \
-  --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev \
+  --bundle dist/chargesend-0.1.0-codex-0.163.0-x86_64-unknown-linux-gnu-dev \
   --as-codex
 export PATH="$HOME/.local/bin:$PATH"
 ```

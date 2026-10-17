@@ -56,6 +56,13 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertFalse((self.source / ".chargesend-applied.json").exists())
         self.assertFalse((self.source / next(iter(workflow.OVERLAYS.values()))).exists())
 
+    def test_missing_port_patch_is_clear_and_leaves_source_untouched(self):
+        self.patch.unlink()
+        with self.assertRaisesRegex(workflow.Failure, "No ChargeSend patch is ready"):
+            workflow.apply_to(self.source, "fixture")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        self.assertFalse((self.source / ".chargesend-applied.json").exists())
+
     def test_dirty_source_and_changed_prepared_source_are_rejected(self):
         (self.source / "notes.txt").write_text("user work")
         with self.assertRaisesRegex(workflow.Failure, "dirty"):

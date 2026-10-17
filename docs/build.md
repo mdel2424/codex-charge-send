@@ -17,9 +17,9 @@ Kitty. It does not install or replace a Codex binary.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py prepare --tag rust-v0.161.0
-python3 scripts/chargesend.py test --tag rust-v0.161.0
-python3 scripts/chargesend.py build --tag rust-v0.161.0 --profile dev
+python3 scripts/chargesend.py prepare --tag rust-v0.163.0
+python3 scripts/chargesend.py test --tag rust-v0.163.0
+python3 scripts/chargesend.py build --tag rust-v0.163.0 --profile dev
 ```
 
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
@@ -67,12 +67,12 @@ When an agent session has no network but your normal terminal does, run:
 bash scripts/fetch-upstream.sh
 export CARGO_HOME="$PWD/.build/cargo"
 export CARGO_NET_OFFLINE=true
-python3 scripts/chargesend.py build --tag rust-v0.161.0
+python3 scripts/chargesend.py build --tag rust-v0.163.0
 ```
 
-The download script fetches both catalogued release checkouts and their locked
+The download script fetches all catalogued release checkouts and their locked
 Cargo dependencies into the workspace. Pass a tag to download only that release.
-Sources are left unpatched. Rust must already be installed for both releases.
+Sources are left unpatched. Rust must already be installed for the selected releases.
 Some dependencies have build-time downloads outside Cargo; if an offline build
 reports one, obtain that exact artifact in your normal terminal as well.
 
@@ -139,6 +139,21 @@ At narrow terminal widths the effort label appears before the clipped bar.
 
 Set `CHARGESEND_DISABLE=1` for ordinary Enter submission. Codex's existing
 `CODEX_TUI_DISABLE_KEYBOARD_ENHANCEMENT` setting also prevents charging.
+
+## Revert a project-local update
+
+Versioned installs retain older bundles. To switch the existing project-local
+launcher back to the verified 0.161.0 build:
+
+```bash
+python3 scripts/chargesend.py install \
+  --bundle dist/chargesend-0.1.0-codex-0.161.0-x86_64-unknown-linux-gnu-dev \
+  --prefix "$PWD/local"
+```
+
+Restart Codex after switching. The existing `~/.local/bin/codex` mapping follows
+`local/bin/chargesend`; no relinking or settings changes are needed. This command
+requires keeping the older bundle in `dist/`.
 
 ## Port to another release
 

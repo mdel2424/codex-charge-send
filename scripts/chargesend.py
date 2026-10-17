@@ -102,6 +102,9 @@ def checkout(tag: str, supplied: str | None) -> Path:
 
 
 def apply_to(source: Path, tag: str) -> None:
+    patch = patch_for(tag)
+    if not patch.is_file():
+        raise Failure(f"No ChargeSend patch is ready for {tag}: {patch}. Source downloads are available; finish the port before preparing or building this release.")
     stamp = source / ".chargesend-applied.json"
     identity = {"tag": tag, "fingerprint": fingerprint(tag), "workspace_lock_alignment": 1}
     if stamp.exists():
@@ -199,7 +202,11 @@ def test_source(source: Path) -> None:
     run(["cargo", "fmt", "--all"], cwd=workspace, capture=True)
     record_prepared_files(source)
     run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace, capture=True)
-    for filter_name in ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests", "status_indicator_widget::tests"]:
+    filters = ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests", "status_indicator_widget::tests"]
+    if (workspace / "tui/src/activation_key_guard.rs").exists():
+        # 0.163 adds settings-editor handoff guards and leader-key input routing.
+        filters += ["activation_key_guard::tests", "config_panel::tests", "app::input::", "app::tests::key_chords::", "bottom_pane::tests::view_transition_key_guard"]
+    for filter_name in filters:
         run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace)
 
 

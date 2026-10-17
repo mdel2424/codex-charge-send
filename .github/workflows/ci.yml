@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tag: [rust-v0.161.0, rust-v0.160.0]
+        tag: [rust-v0.163.0, rust-v0.161.0, rust-v0.160.0]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
