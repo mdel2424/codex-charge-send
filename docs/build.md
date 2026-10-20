@@ -17,8 +17,6 @@ Kitty. It does not install or replace a Codex binary.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py prepare --tag rust-v0.163.0
-python3 scripts/chargesend.py test --tag rust-v0.163.0
 python3 scripts/chargesend.py build --tag rust-v0.163.0 --profile dev
 ```
 
@@ -51,12 +49,38 @@ Inputs and source hashes are rechecked after compilation so an edit during the
 build cannot produce a bundle with a misleading patch fingerprint.
 After changing the patch or modules, use a fresh checkout.
 
-For constrained machines, the following keeps memory and debug output smaller:
+## Build cache and cleanup
+
+Builds and tests share `.build/target` across upstream checkouts. The workflow
+defaults to disabled incremental compilation and no dev, test, or release debug
+information. Existing `CARGO_*` environment overrides are respected.
+
+Successful `build` and `test` commands remove that compiled cache after finishing.
+Built bundles in `dist/`, installed commands in `local/`, downloaded dependencies,
+and source checkouts are retained. The next build recompiles; cached dependencies
+do not need downloading again. Failed builds retain artifacts so they can resume.
+
+For repeated development, keep the cache until finished:
 
 ```bash
-export CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0
-export CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
-export CARGO_TARGET_DIR="$PWD/.build/target"
+python3 scripts/chargesend.py build --tag rust-v0.163.0 --keep-build-cache
+python3 scripts/chargesend.py clean
+```
+
+The `clean` command removes only `.build/target` and the old `.build/target-check`
+cache. It refuses symlinked cache directories or a cache Cargo is actively using.
+Preparation, builds, tests, and cleanup share a workflow lock. An explicitly
+overridden `CARGO_TARGET_DIR` is retained rather than automatically deleting a
+potentially shared cache; clean that directory yourself when appropriate.
+Direct Cargo commands should use `CARGO_TARGET_DIR="$PWD/.build/target"` to share
+these artifacts. CI retains the cache through compilation and Clippy, then cleans it.
+Source checkouts are never automatically deleted, since they may contain porting
+work or Git objects used by other checkouts.
+
+To limit memory use as well:
+
+```bash
+export CARGO_BUILD_JOBS=2
 ```
 
 ## Download for an offline agent

@@ -1,6 +1,7 @@
 """Test real patch/file/launcher operations without a compiler or live backend."""
 
 import argparse
+import fcntl
 import importlib.util
 import json
 import os
@@ -120,6 +121,146 @@ class PatchWorkflowTests(unittest.TestCase):
         with mock.patch.object(workflow.shutil, "which", return_value=None):
             with self.assertRaisesRegex(workflow.Failure, "setup-ubuntu.sh"):
                 workflow.prerequisites("rust-v0.161.0")
+
+
+class BuildCacheTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="chargesend-cache-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        patcher = mock.patch.object(workflow, "ROOT", self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        environment = mock.patch.dict(os.environ, {}, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.target = self.root / ".build/target"
+        self.legacy = self.root / ".build/target-check"
+        for target in [self.target, self.legacy]:
+            (target / "debug").mkdir(parents=True)
+            (target / "debug/.cargo-lock").touch()
+            (target / "debug/test-binary").write_text("compiled artifact")
+        self.preserved = [
+            self.root / ".build/cargo/registry/download",
+            self.root / ".build/upstream/source.rs",
+            self.root / "dist/bundle/chargesend-cli",
+            self.root / "local/lib/chargesend/installed-cli",
+        ]
+        for path in self.preserved:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("retain this")
+
+    def main(self, *arguments):
+        with mock.patch("sys.argv", ["chargesend.py", *arguments]):
+            return workflow.main()
+
+    def assert_preserved(self):
+        for path in self.preserved:
+            self.assertEqual(path.read_text(), "retain this")
+
+    def test_defaults_share_cache_and_reduce_output_without_overriding_environment(self):
+        workflow.configure_cargo()
+        self.assertEqual(os.environ["CARGO_TARGET_DIR"], str(self.target))
+        for name in ["CARGO_INCREMENTAL", "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG", "CARGO_PROFILE_RELEASE_DEBUG"]:
+            self.assertEqual(os.environ[name], "0")
+        overrides = {"CARGO_TARGET_DIR": "caller-target", "CARGO_INCREMENTAL": "1", "CARGO_PROFILE_DEV_DEBUG": "2"}
+        os.environ.update(overrides)
+        workflow.configure_cargo()
+        for name, value in overrides.items():
+            self.assertEqual(os.environ[name], value)
+
+    def test_successful_build_removes_managed_artifacts_but_preserves_bundles_and_downloads(self):
+        with mock.patch.object(workflow, "build") as build:
+            self.assertEqual(self.main("build"), 0)
+            build.assert_called_once()
+        self.assertFalse(self.target.exists())
+        self.assert_preserved()
+
+    def test_successful_test_command_also_cleans_its_artifacts(self):
+        with mock.patch.object(workflow, "prerequisites"), mock.patch.object(workflow, "prepare", return_value=self.root / ".build/upstream"), mock.patch.object(workflow, "test_source") as test:
+            self.assertEqual(self.main("test"), 0)
+            test.assert_called_once_with(self.root / ".build/upstream")
+        self.assertFalse(self.target.exists())
+        self.assert_preserved()
+
+    def test_keep_flag_and_failed_build_retain_artifacts(self):
+        with mock.patch.object(workflow, "build"):
+            self.assertEqual(self.main("build", "--keep-build-cache"), 0)
+        self.assertTrue((self.target / "debug/test-binary").exists())
+        with mock.patch.object(workflow, "build", side_effect=workflow.Failure("compiler failed")):
+            self.assertEqual(self.main("build"), 1)
+        self.assertTrue((self.target / "debug/test-binary").exists())
+        self.assert_preserved()
+
+    def test_overridden_target_is_never_automatically_deleted(self):
+        caller_target = self.root / "shared-target"
+        caller_target.mkdir()
+        (caller_target / "artifact").write_text("another project's cache")
+        os.environ["CARGO_TARGET_DIR"] = str(caller_target)
+        with mock.patch.object(workflow, "build"):
+            self.assertEqual(self.main("build"), 0)
+        self.assertEqual((caller_target / "artifact").read_text(), "another project's cache")
+        self.assertTrue(self.target.exists())
+
+    def test_explicit_cleanup_is_idempotent_and_removes_only_managed_caches(self):
+        with mock.patch.object(workflow, "prerequisites", side_effect=AssertionError("clean needs no compiler")):
+            self.assertEqual(self.main("clean"), 0)
+            self.assertEqual(self.main("clean"), 0)
+        self.assertFalse(self.target.exists())
+        self.assertFalse(self.legacy.exists())
+        self.assert_preserved()
+
+    def test_active_cargo_lock_prevents_partial_cleanup(self):
+        with (self.legacy / "debug/.cargo-lock").open("r+b") as stream:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(self.main("clean"), 1)
+        self.assertTrue((self.target / "debug/test-binary").exists())
+        self.assertTrue((self.legacy / "debug/test-binary").exists())
+        self.assert_preserved()
+
+    def test_busy_workflow_refuses_cleanup_before_touching_files(self):
+        with workflow.build_cache_lock():
+            self.assertEqual(self.main("clean"), 1)
+        self.assertTrue(self.target.exists())
+        self.assertTrue(self.legacy.exists())
+
+    def test_symlinked_target_is_not_followed(self):
+        shutil.rmtree(self.target)
+        precious = self.root / "precious"
+        precious.mkdir()
+        (precious / "keep").write_text("user data")
+        self.target.symlink_to(precious, target_is_directory=True)
+        self.assertEqual(self.main("clean"), 1)
+        self.assertEqual((precious / "keep").read_text(), "user data")
+        self.assertTrue(self.legacy.exists())
+
+    def test_symlinked_build_directory_is_not_followed(self):
+        shutil.rmtree(self.root / ".build")
+        precious = self.root / "precious"
+        (precious / "target").mkdir(parents=True)
+        (precious / "target/keep").write_text("user data")
+        (self.root / ".build").symlink_to(precious, target_is_directory=True)
+        self.assertEqual(self.main("clean"), 1)
+        self.assertEqual((precious / "target/keep").read_text(), "user data")
+
+    def test_shell_wrapper_forwards_cache_options_with_or_without_positional_tag(self):
+        tools = self.root / "tools"
+        tools.mkdir()
+        python = tools / "python3"
+        python.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        python.chmod(0o755)
+        for arguments, expected in [
+            ([], []),
+            (["--keep-build-cache"], ["--keep-build-cache"]),
+            (["rust-v0.161.0", "--keep-build-cache"], ["--tag", "rust-v0.161.0", "--keep-build-cache"]),
+            (["--source", "source with spaces"], ["--source", "source with spaces"]),
+        ]:
+            with self.subTest(arguments=arguments):
+                actual = subprocess.check_output(
+                    ["/bin/bash", str(ROOT / "scripts/build.sh"), *arguments],
+                    env={"PATH": str(tools) + os.pathsep + "/usr/bin:/bin"}, text=True,
+                ).splitlines()
+                self.assertEqual(actual, [str(ROOT / "scripts/chargesend.py"), "build", *expected])
 
 
 class InstallationTests(unittest.TestCase):

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 chargesend_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-chargesend_tag=${1:-rust-v0.163.0}
-if (( $# )); then shift; fi
-exec python3 "$chargesend_root/scripts/chargesend.py" build --tag "$chargesend_tag" "$@"
+if (( $# )) && [[ "$1" != -* ]]; then
+  chargesend_tag=$1
+  shift
+  exec python3 "$chargesend_root/scripts/chargesend.py" build --tag "$chargesend_tag" "$@"
+fi
+exec python3 "$chargesend_root/scripts/chargesend.py" build "$@"

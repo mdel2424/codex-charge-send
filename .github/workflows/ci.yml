@@ -26,6 +26,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
       CARGO_INCREMENTAL: "0"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.build/target
       RUST_BACKTRACE: "1"
       RUST_MIN_STACK: "8388608"
       CARGO_PROFILE_DEV_DEBUG: "0"
@@ -39,7 +40,7 @@ jobs:
       - name: Pinned Rust
         run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --component rust-src
       - name: Fetch, check patch, test, compile CLI and runtime helper
-        run: python3 scripts/chargesend.py build --tag '${{ matrix.tag }}'
+        run: python3 scripts/chargesend.py build --tag '${{ matrix.tag }}' --keep-build-cache
       - name: Scoped Rust lint check
         working-directory: .build/upstream/${{ matrix.tag }}/codex-rs
         run: cargo clippy --locked -p codex-tui --lib --tests
@@ -54,6 +55,9 @@ jobs:
           "$RUNNER_TEMP/chargesend-install/bin/chargesend" --version
           "$RUNNER_TEMP/chargesend-install/bin/codex" --version
           python3 scripts/chargesend.py uninstall --prefix "$RUNNER_TEMP/chargesend-install"
+      - name: Remove compiled cache
+        if: always()
+        run: python3 scripts/chargesend.py clean
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: chargesend-${{ matrix.tag }}

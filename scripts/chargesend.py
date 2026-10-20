@@ -11,6 +11,8 @@ checkout untouched.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, ExitStack
+import fcntl
 import hashlib
 import json
 import os
@@ -330,6 +332,95 @@ def build(args: argparse.Namespace) -> None:
     bundle(source, args.tag, args.profile, helper)
 
 
+def configure_cargo() -> None:
+    """Share artifacts across checkouts, with small defaults callers can override."""
+    for name, value in {
+        "CARGO_TARGET_DIR": str(ROOT / ".build/target"),
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    }.items():
+        os.environ.setdefault(name, value)
+
+
+@contextmanager
+def build_cache_lock():
+    """Keep CLI preparation/build/test/cleanup from racing over shared artifacts."""
+    directory = ROOT / ".build"
+    if directory.is_symlink():
+        raise Failure("Refusing to manage a symlinked .build directory.")
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / ".chargesend-build.lock").open("a+b") as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise Failure("Another ChargeSend build, test, preparation, or cleanup is running. Retry when it finishes.") from error
+        yield
+
+
+def clean_build_cache(*, legacy: bool = False) -> None:
+    """Remove only known compiled caches, retaining downloads, source and bundles."""
+    directory = ROOT / ".build"
+    if directory.is_symlink():
+        raise Failure("Refusing to clean a symlinked .build directory.")
+    targets = [directory / "target"]
+    if legacy:
+        targets.append(directory / "target-check")
+    with ExitStack() as locks:
+        present = []
+        # Preflight every target before removing anything. Cargo locks also
+        # protect against builds started directly, outside this Python workflow.
+        for target in targets:
+            if target.is_symlink():
+                raise Failure(f"Refusing to clean symlinked build cache: {target}")
+            if not target.exists():
+                continue
+            if not target.is_dir():
+                raise Failure(f"Build cache is not a directory: {target}")
+            for lock in target.rglob(".cargo-lock"):
+                if lock.is_symlink():
+                    raise Failure(f"Refusing to follow symlinked Cargo lock: {lock}")
+                stream = locks.enter_context(lock.open("r+b"))
+                try:
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError as error:
+                    raise Failure(f"Cargo is using {target}. Retry cleanup when the build finishes.") from error
+            present.append(target)
+        for target in present:
+            shutil.rmtree(target)
+            print(f"Removed compiled build cache: {target}")
+        if not present:
+            print("No compiled build caches to remove.")
+
+
+def run_build_command(args: argparse.Namespace) -> None:
+    with build_cache_lock():
+        if args.command == "prepare":
+            prepare(args)
+            return
+        if args.command == "clean":
+            clean_build_cache(legacy=True)
+            return
+        configure_cargo()
+        if args.command == "test":
+            prerequisites(args.tag)
+            test_source(prepare(args))
+        else:
+            build(args)
+        # A failed build retains its artifacts for diagnosis and resuming. Never
+        # remove a caller's shared/external CARGO_TARGET_DIR automatically.
+        if args.keep_build_cache:
+            print(f"Retained compiled build cache: {os.environ['CARGO_TARGET_DIR']}")
+        elif Path(os.environ["CARGO_TARGET_DIR"]) != ROOT / ".build/target":
+            print(f"Retained overridden CARGO_TARGET_DIR: {os.environ['CARGO_TARGET_DIR']}")
+        else:
+            try:
+                clean_build_cache()
+            except (Failure, OSError) as error:
+                print(f"Build checks succeeded; cache cleanup skipped: {error}", file=sys.stderr)
+
+
 def validated_bundle(path: Path) -> dict:
     try:
         metadata = json.loads((path / "manifest.json").read_text())
@@ -461,9 +552,12 @@ def main() -> int:
         sub = subparsers.add_parser(name)
         sub.add_argument("--tag", default=CATALOG["default"])
         sub.add_argument("--source", help="full clean checkout at the pinned release commit")
+        if name in ["test", "build"]:
+            sub.add_argument("--keep-build-cache", action="store_true", help="keep compiled artifacts for faster rebuilds; successful builds/tests otherwise remove the managed cache")
         if name == "build":
             sub.add_argument("--profile", choices=["dev", "release"], default="dev")
             sub.add_argument("--code-mode-host", help="reuse an existing compatible runtime helper instead of compiling its JavaScript engine")
+    subparsers.add_parser("clean", help="remove managed compiled caches; keep source, downloads, bundles and installations")
     sub = subparsers.add_parser("install")
     sub.add_argument("--bundle", required=True)
     sub.add_argument("--prefix", default=str(Path.home() / ".local"))
@@ -477,13 +571,8 @@ def main() -> int:
     sub.add_argument("--prefix", default=str(Path.home() / ".local"))
     args = parser.parse_args()
     try:
-        if args.command == "prepare":
-            prepare(args)
-        elif args.command == "test":
-            prerequisites(args.tag)
-            test_source(prepare(args))
-        elif args.command == "build":
-            build(args)
+        if args.command in ["prepare", "test", "build", "clean"]:
+            run_build_command(args)
         elif args.command == "install":
             install(args)
         elif args.command == "link-codex":
