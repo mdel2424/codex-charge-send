@@ -17,7 +17,7 @@ Kitty. It does not install or replace a Codex binary.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.163.0 --profile dev
+python3 scripts/chargesend.py build --tag rust-v0.166.0 --profile dev
 ```
 
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
@@ -63,12 +63,14 @@ do not need downloading again. Failed builds retain artifacts so they can resume
 For repeated development, keep the cache until finished:
 
 ```bash
-python3 scripts/chargesend.py build --tag rust-v0.163.0 --keep-build-cache
+python3 scripts/chargesend.py build --tag rust-v0.166.0 --keep-build-cache
 python3 scripts/chargesend.py clean
 ```
 
-The `clean` command removes only `.build/target` and the old `.build/target-check`
-cache. It refuses symlinked cache directories or a cache Cargo is actively using.
+The `clean` command removes `.build/target`, the old `.build/target-check`, and
+legacy `codex-rs/target` caches inside `.build/upstream/<catalogued-release>`.
+It retains the upstream source itself and leaves unrelated directories alone.
+It refuses symlinked cache paths or a cache Cargo is actively using.
 Preparation, builds, tests, and cleanup share a workflow lock. An explicitly
 overridden `CARGO_TARGET_DIR` is retained rather than automatically deleting a
 potentially shared cache; clean that directory yourself when appropriate.
@@ -91,7 +93,7 @@ When an agent session has no network but your normal terminal does, run:
 bash scripts/fetch-upstream.sh
 export CARGO_HOME="$PWD/.build/cargo"
 export CARGO_NET_OFFLINE=true
-python3 scripts/chargesend.py build --tag rust-v0.163.0
+python3 scripts/chargesend.py build --tag rust-v0.166.0
 ```
 
 The download script fetches all catalogued release checkouts and their locked
@@ -120,6 +122,8 @@ python3 scripts/chargesend.py uninstall --prefix "$HOME/.local"
 `--as-codex` saves the existing command as `codex-stock` and links `codex` to the
 installed ChargeSend launcher. Arguments are forwarded unchanged. Repeating the
 same mapping is safe; an existing conflicting backup is never overwritten.
+If an official update restores `codex` while `codex-stock` points to that same
+official executable, remapping keeps the existing backup.
 Uninstall restores the original command when its `codex` points to this install.
 Omit `--as-codex` to leave the `codex` command alone.
 

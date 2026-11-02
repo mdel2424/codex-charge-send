@@ -1,6 +1,25 @@
 # Verification record
 
-Current default: **Codex 0.163.0**, ported and installed on 2026-10-17.
+Current default: **Codex 0.166.0**, ported on 2026-11-01, pinned to commit
+`6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`. The complete build workflow passed
+887 focused Rust tests, pinned formatting, and native CLI compilation. Scoped
+Clippy passed without warnings; 39 Python workflow tests passed. Native
+CLI/version/help, the executor subcommand, and the matching official JavaScript
+helper passed startup checks. The bundle is prepared under `dist/` and `local/`.
+Updating the normal `~/.local` installation requires the installer from the user
+terminal because that directory is read-only to this build session. GitHub
+Actions and physical Kitty checks were not run for this revision.
+
+The 0.166.0 patch preserves transcript selection/copy exit releases and preset
+activation releases even when ChargeSend drains Enter releases. Preset menus and
+footer overrides retain ownership of Enter. Dedicated tests cover those guards;
+the shared selected-effort, constant-speed controller and request settings tests
+also pass. Regression coverage additionally includes 263 transcript-view tests,
+16 keyboard-mode tests, and upstream preset/copy/backtrack tests. See
+[source-provenance-0.166.0.json](source-provenance-0.166.0.json) and
+[build-results.json](build-results.json) for pinned inputs and executable hashes.
+
+Previous baseline: **Codex 0.163.0**, ported and installed on 2026-10-17.
 The 0.161.0 bundle remains available for rollback. Earlier records below retain
 their original baseline and physical-test scope.
 

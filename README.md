@@ -13,7 +13,7 @@ terminal interface, authentication, settings, and agent functionality.
 ChargeSend extends Codex's Rust `codex-tui` crate. The release-specific diffs in
 [patches/](patches/) integrate with keyboard setup, event dispatch, the composer,
 and prompt submission. [overlays.json](overlays.json) maps the dedicated Rust
-modules into the upstream checkout; those modules are shared by the 0.163.0, 0.161.0, and
+modules into the upstream checkout; those modules are shared by the 0.166.0, 0.163.0, 0.161.0, and
 0.160.0 patches.
 
 **Keyboard negotiation.** [capability.rs](module/chargesend/capability.rs) enables
@@ -46,9 +46,10 @@ changes to the thread, draft, collaboration settings, or effort choices cancel
 the charge. An application-level Enter-down latch survives widget replacement
 and consumes repeats until release, preventing a cancelled hold from submitting
 a different draft. Menus, slash commands, newline bindings, steering, and queued
-input continue through their existing handlers. On 0.163.0, consumed releases
+input continue through their existing handlers. On 0.163.0 and later, consumed releases
 still notify settings-editor activation guards and covered views, without
-dispatching another menu action.
+dispatching another menu action. The 0.166.0 port also retires transcript
+selection/copy exit guards and preset-menu guards on consumed releases.
 
 **Request settings.** Effort choices come from the active model's
 `supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
@@ -95,9 +96,9 @@ From the repository directory:
 ```bash
 bash scripts/setup-ubuntu.sh
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.163.0
+python3 scripts/chargesend.py build --tag rust-v0.166.0
 python3 scripts/chargesend.py install \
-  --bundle dist/chargesend-0.1.0-codex-0.163.0-x86_64-unknown-linux-gnu-dev \
+  --bundle dist/chargesend-0.1.0-codex-0.166.0-x86_64-unknown-linux-gnu-dev \
   --as-codex
 export PATH="$HOME/.local/bin:$PATH"
 ```

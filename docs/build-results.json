@@ -1,7 +1,7 @@
 {
   "product": "ChargeSend",
   "version": "0.1.0",
-  "date": "2026-10-17",
+  "date": "2026-11-01",
   "platform": "Ubuntu 26.04, x86_64 Linux",
   "releases": {
     "rust-v0.161.0": {
@@ -69,9 +69,42 @@
       "installation": "project-local installation updated; ~/.local/bin/codex resolves to local/bin/chargesend; 0.161.0 rollback bundle preserved",
       "physical_keyboard_check": "not repeated on 0.163.0",
       "verification_scope": "521 tests via Cargo lib-test filters; 45 additional upstream input/settings tests run directly from that same compiled test binary; all filters included in the build workflow"
+    },
+    "rust-v0.166.0": {
+      "upstream_commit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+      "patch_fingerprint": "75fc85ffb67bb56bcaa1f98ea97ee942b78afd7933e0580469d509d3faefe749",
+      "binary_sha256": "7423da2d8ceedd5c73ce67bd632ccfdeb3faea1c9dd23225b247429e691e98ff",
+      "code_mode_host_sha256": "657f4e902726e05867c937b583049d5997e057f8cd0ab40450633c9c9ef8d630",
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+      "bundle": "dist/chargesend-0.1.0-codex-0.166.0-x86_64-unknown-linux-gnu-dev",
+      "native_compilation": "passed",
+      "rust_tests": {
+        "chargesend": 45,
+        "composer": 420,
+        "plan_mode": 61,
+        "event_stream": 10,
+        "working_status": 10,
+        "activation_key_guard": 1,
+        "config_panel": 19,
+        "app_input": 2,
+        "key_chords": 23,
+        "view_transition_guard": 1,
+        "quick_dials": 2,
+        "transcript_selection": 2,
+        "copy_mode": 1,
+        "app_backtrack": 11,
+        "transcript_view": 263,
+        "keyboard_modes": 16
+      },
+      "total_rust_tests": 887,
+      "clippy": "passed: cargo clippy --locked -p codex-tui --lib --tests; no warnings",
+      "revision": "0.166.0 port; transcript selection/copy and preset release guards preserved; shared selected-effort and constant-speed logic unchanged",
+      "installation": "project-local bundle prepared; normal ~/.local installation requires installer from the user terminal",
+      "physical_keyboard_check": "not repeated on 0.166.0",
+      "verification_scope": "all listed filters passed through the reproducible build workflow; native CLI, executor subcommand and matching JavaScript helper startup checks passed"
     }
   },
-  "python_workflow_tests": 24,
+  "python_workflow_tests": 39,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "not run during this local verification",

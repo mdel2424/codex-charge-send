@@ -208,6 +208,9 @@ def test_source(source: Path) -> None:
     if (workspace / "tui/src/activation_key_guard.rs").exists():
         # 0.163 adds settings-editor handoff guards and leader-key input routing.
         filters += ["activation_key_guard::tests", "config_panel::tests", "app::input::", "app::tests::key_chords::", "bottom_pane::tests::view_transition_key_guard"]
+    if (workspace / "tui/src/chatwidget/quick_dials.rs").exists():
+        # 0.166 adds preset-menu and keyboard transcript-selection release guards.
+        filters += ["chatwidget::tests::quick_dials_tests", "app::tests::transcript_selection", "app::tests::copy_mode_tests", "app_backtrack::tests", "transcript_view::", "tui::keyboard_modes::tests"]
     for filter_name in filters:
         run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace)
 
@@ -367,13 +370,20 @@ def clean_build_cache(*, legacy: bool = False) -> None:
     targets = [directory / "target"]
     if legacy:
         targets.append(directory / "target-check")
+        targets.extend(
+            directory / "upstream" / tag / "codex-rs/target"
+            for tag in CATALOG["releases"]
+        )
     with ExitStack() as locks:
         present = []
         # Preflight every target before removing anything. Cargo locks also
         # protect against builds started directly, outside this Python workflow.
         for target in targets:
-            if target.is_symlink():
-                raise Failure(f"Refusing to clean symlinked build cache: {target}")
+            ancestor = directory
+            for part in target.relative_to(directory).parts:
+                ancestor = ancestor / part
+                if ancestor.is_symlink():
+                    raise Failure(f"Refusing to clean symlinked build cache path: {ancestor}")
             if not target.exists():
                 continue
             if not target.is_dir():
@@ -448,11 +458,16 @@ def link_codex(args: argparse.Namespace) -> None:
         print(f"{command} already launches ChargeSend.")
         return
     already_mapped = command.is_symlink() and managed_launcher(command)
+    original_already_saved = False
     if command.exists() or command.is_symlink():
         if not command.is_file():
             raise Failure(f"{command} is not a working executable file; refusing to replace it.")
         if not already_mapped and (stock.exists() or stock.is_symlink()):
-            raise Failure(f"{stock} already exists; refusing to overwrite your saved Codex.")
+            # An official update may restore `codex` while `codex-stock` still
+            # points to the same official executable. Keep that existing backup.
+            original_already_saved = stock.is_file() and stock.samefile(command)
+            if not original_already_saved:
+                raise Failure(f"{stock} already exists; refusing to overwrite your saved Codex.")
     command.parent.mkdir(parents=True, exist_ok=True)
     temporary = command.with_name(".codex-chargesend-link.tmp")
     if temporary.exists() or temporary.is_symlink():
@@ -460,7 +475,7 @@ def link_codex(args: argparse.Namespace) -> None:
     temporary.symlink_to(launcher)
     saved_original = False
     try:
-        if not already_mapped and (command.exists() or command.is_symlink()):
+        if not already_mapped and not original_already_saved and (command.exists() or command.is_symlink()):
             command.rename(stock)
             saved_original = True
         try:

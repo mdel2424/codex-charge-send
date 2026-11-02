@@ -70,3 +70,9 @@ For the 0.163.0 port, also open `/config`, hold/release Enter while opening a
 setting editor, then accept it with a fresh press. Check the Ctrl+X leader
 shortcuts and return to an idle draft. Automated settings-editor and chord tests
 pass; the physical keyboard checks on this baseline remain outstanding.
+
+For the 0.166.0 port, exercise transcript keyboard selection and copy, then
+release Enter and verify the next fresh Enter reaches the composer. Open the
+preset menu with its configured shortcut; Enter must neither charge nor send
+the existing draft, and releasing a preset activation key must retire its guard.
+These physical checks remain separate from automated input-routing tests.

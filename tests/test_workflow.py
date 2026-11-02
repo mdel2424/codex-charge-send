@@ -224,6 +224,45 @@ class BuildCacheTests(unittest.TestCase):
         self.assertTrue(self.target.exists())
         self.assertTrue(self.legacy.exists())
 
+    def legacy_workspace_cache(self):
+        workspace = self.root / ".build/upstream" / workflow.CATALOG["default"] / "codex-rs"
+        target = workspace / "target"
+        (target / "debug").mkdir(parents=True)
+        (target / "debug/.cargo-lock").touch()
+        (target / "debug/test-binary").write_text("compiled artifact")
+        (workspace / "Cargo.toml").write_text("source manifest")
+        return target
+
+    def test_cleanup_includes_legacy_upstream_caches_and_retains_source(self):
+        target = self.legacy_workspace_cache()
+        unrelated = self.root / ".build/upstream/custom/codex-rs/target"
+        unrelated.mkdir(parents=True)
+        (unrelated / "keep").write_text("unmanaged directory")
+        self.assertEqual(self.main("clean"), 0)
+        self.assertFalse(target.exists())
+        self.assertEqual((target.parent / "Cargo.toml").read_text(), "source manifest")
+        self.assertEqual((unrelated / "keep").read_text(), "unmanaged directory")
+        self.assert_preserved()
+
+    def test_active_legacy_workspace_cache_prevents_all_cleanup(self):
+        target = self.legacy_workspace_cache()
+        with (target / "debug/.cargo-lock").open("r+b") as stream:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(self.main("clean"), 1)
+        self.assertTrue(target.exists())
+        self.assertTrue(self.target.exists())
+        self.assertTrue(self.legacy.exists())
+
+    def test_symlinked_legacy_checkout_is_not_followed(self):
+        precious = self.root / "precious"
+        (precious / "codex-rs/target").mkdir(parents=True)
+        (precious / "codex-rs/target/keep").write_text("user data")
+        checkout = self.root / ".build/upstream" / workflow.CATALOG["default"]
+        checkout.symlink_to(precious, target_is_directory=True)
+        self.assertEqual(self.main("clean"), 1)
+        self.assertEqual((precious / "codex-rs/target/keep").read_text(), "user data")
+        self.assertTrue(self.target.exists())
+
     def test_symlinked_target_is_not_followed(self):
         shutil.rmtree(self.target)
         precious = self.root / "precious"
@@ -346,6 +385,22 @@ class InstallationTests(unittest.TestCase):
         self.assertEqual(os.readlink(self.prefix / "bin/codex-stock"), "original-codex")
         workflow.restore_codex(args)
         self.assertEqual(os.readlink(command), "original-codex")
+
+    def test_stock_update_can_be_remapped_when_existing_backup_matches(self):
+        command = self.prefix / "bin/codex"
+        command.unlink()
+        official = self.prefix / "bin/official-codex"
+        official.write_text("official updated executable")
+        command.symlink_to(official)
+        stock = self.prefix / "bin/codex-stock"
+        stock.symlink_to(official)
+        self.args.as_codex = True
+        workflow.install(self.args)
+        self.assertEqual(command.resolve(), self.prefix / "bin/chargesend")
+        self.assertEqual(os.readlink(stock), str(official))
+        workflow.restore_codex(argparse.Namespace(prefix=str(self.prefix)))
+        self.assertEqual(command.resolve(), official)
+        self.assertEqual(official.read_text(), "official updated executable")
 
     def test_mapping_and_restoration_refuse_conflicts(self):
         workflow.install(self.args)
