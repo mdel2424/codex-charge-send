@@ -1,7 +1,7 @@
 {
   "product": "ChargeSend",
   "version": "0.1.0",
-  "date": "2026-11-01",
+  "date": "2026-11-02",
   "platform": "Ubuntu 26.04, x86_64 Linux",
   "releases": {
     "rust-v0.161.0": {
@@ -99,12 +99,22 @@
       "total_rust_tests": 887,
       "clippy": "passed: cargo clippy --locked -p codex-tui --lib --tests; no warnings",
       "revision": "0.166.0 port; transcript selection/copy and preset release guards preserved; shared selected-effort and constant-speed logic unchanged",
-      "installation": "project-local bundle prepared; normal ~/.local installation requires installer from the user terminal",
+      "installation": "installed and verified at ~/.local: codex and chargesend launch ChargeSend 0.1.0 on Codex 0.166.0; stock 0.166.0 and earlier stock 0.161.0 backups preserved",
       "physical_keyboard_check": "not repeated on 0.166.0",
-      "verification_scope": "all listed filters passed through the reproducible build workflow; native CLI, executor subcommand and matching JavaScript helper startup checks passed"
+      "verification_scope": "all listed filters passed through the reproducible build workflow; native CLI, executor subcommand and matching JavaScript helper startup checks passed",
+      "update_recovery": {
+        "date": "2026-11-02",
+        "failure": "Two upstream transcript snapshots inherited Kitty truecolor; generated .snap.new files then blocked retries.",
+        "fix": "Test-only NO_COLOR=1, FORCE_COLOR=0, INSTA_UPDATE=no; installed UI colors unchanged.",
+        "checks": "887 Rust tests passed; native rebuild checksum unchanged; source integrity and launcher, executor and JavaScript helper startup checks passed.",
+        "updater": "Project-local installation and repeat update passed with forced truecolor; reused bundle without compilation; persistent log enabled.",
+        "clippy": "Previously passed; not rerun for Python-only workflow changes.",
+        "installation": "User ran the updater; installed checksums, current patch fingerprint, native help, codex mapping and both stock backup versions verified.",
+        "compiled_cache": "removed after successful verification"
+      }
     }
   },
-  "python_workflow_tests": 39,
+  "python_workflow_tests": 49,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "not run during this local verification",

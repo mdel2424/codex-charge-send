@@ -211,8 +211,13 @@ def test_source(source: Path) -> None:
     if (workspace / "tui/src/chatwidget/quick_dials.rs").exists():
         # 0.166 adds preset-menu and keyboard transcript-selection release guards.
         filters += ["chatwidget::tests::quick_dials_tests", "app::tests::transcript_selection", "app::tests::copy_mode_tests", "app_backtrack::tests", "transcript_view::", "tui::keyboard_modes::tests"]
+    # Match the upstream snapshots' noninteractive palette even when building
+    # from Kitty. Keep these settings local to test children; the installed TUI
+    # must still detect and use the user's terminal colors normally. Failed
+    # snapshots must not leave .snap.new files in the guarded source checkout.
+    test_env = {**os.environ, "NO_COLOR": "1", "FORCE_COLOR": "0", "INSTA_UPDATE": "no"}
     for filter_name in filters:
-        run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace)
+        run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace, env=test_env)
 
 
 def write_launcher(destination: Path, version: str, tag: str) -> None:

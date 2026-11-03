@@ -3,12 +3,27 @@
 Current default: **Codex 0.166.0**, ported on 2026-11-01, pinned to commit
 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`. The complete build workflow passed
 887 focused Rust tests, pinned formatting, and native CLI compilation. Scoped
-Clippy passed without warnings; 39 Python workflow tests passed. Native
+Clippy previously passed without warnings; 49 Python workflow tests now pass. Native
 CLI/version/help, the executor subcommand, and the matching official JavaScript
 helper passed startup checks. The bundle is prepared under `dist/` and `local/`.
-Updating the normal `~/.local` installation requires the installer from the user
-terminal because that directory is read-only to this build session. GitHub
-Actions and physical Kitty checks were not run for this revision.
+The normal `~/.local` installation was updated from the user's terminal on
+2026-11-02. The `codex` mapping, version, native startup, installed checksums,
+and current patch fingerprint passed verification. GitHub Actions and physical
+Kitty checks were not run for this revision.
+
+Installation recovery on 2026-11-02 reproduced two upstream transcript snapshot
+failures caused by inherited terminal colors. Test subprocesses now receive
+`NO_COLOR=1`, `FORCE_COLOR=0`, and `INSTA_UPDATE=no`; the user's environment and
+the installed UI retain their normal color behavior. All 887 Rust tests and
+native compilation passed again, producing the same executable checksum. The
+one-command updater passed an actual project-local installation and repeat
+update under forced truecolor, reusing the verified bundle without recompiling.
+Its output is saved automatically in `.build/update-local.log`. Stock-backup
+archiving, rollback on mapping failure, and persistent error logging have
+automated coverage. The usual `~/.local/bin/codex` now launches ChargeSend
+0.1.0 on Codex 0.166.0. `codex-stock` retains stock 0.166.0 and
+`codex-stock.previous-1` retains stock 0.161.0; both versions were verified.
+Compiled caches were removed. Clippy was not rerun for these Python-only changes.
 
 The 0.166.0 patch preserves transcript selection/copy exit releases and preset
 activation releases even when ChargeSend drains Enter releases. Preset menus and

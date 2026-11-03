@@ -6,7 +6,7 @@
       "commit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
       "rust": "1.95.0",
       "patch": "patches/chargesend-0.166.0.patch",
-      "status": "native CLI compiled; 887 focused/regression Rust tests, 39 workflow tests and scoped Clippy passed; project-local installation prepared; physical Kitty check pending"
+      "status": "native CLI compiled and installed; 887 focused/regression Rust tests, 49 workflow tests and prior scoped Clippy passed; color-independent build tests and local update verified; physical Kitty check pending"
     },
     "rust-v0.163.0": {
       "commit": "83086188ae0614bd882818ff1aa23f3194962012",

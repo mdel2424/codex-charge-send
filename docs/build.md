@@ -104,6 +104,22 @@ reports one, obtain that exact artifact in your normal terminal as well.
 
 ## Output and installation
 
+To update the local `codex` command to this repository's default release:
+
+```bash
+python3 scripts/update-local.py
+```
+
+Run this from a normal terminal with network access and write access to
+`~/.local`. The updater reuses a checksum-verified bundle when its baseline and
+patch match, or builds and tests it otherwise. It installs ChargeSend and maps
+`codex` to it, retaining the current official command as `codex-stock`. If an
+earlier, different backup already exists, it is preserved as
+`codex-stock.previous-1` (or the next unused number). Successful builds remove
+compiled caches by default. Exit and reopen Codex after updating.
+The updater saves its output in `.build/update-local.log`. Rust snapshot tests
+use a fixed no-color environment independently of the terminal used to build.
+
 Each bundle name includes ChargeSend version, Codex release, host triple, and
 profile. Its `manifest.json` contains the upstream commit, patch/module
 fingerprint, Rust version, original and adjusted lock checksums, binary checksum, automated

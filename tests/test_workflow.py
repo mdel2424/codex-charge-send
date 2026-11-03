@@ -123,6 +123,30 @@ class PatchWorkflowTests(unittest.TestCase):
                 workflow.prerequisites("rust-v0.161.0")
 
 
+class TestEnvironmentTests(unittest.TestCase):
+    def test_interactive_colors_and_snapshot_updates_do_not_leak_into_rust_tests(self):
+        with tempfile.TemporaryDirectory(prefix="chargesend-test-env-") as directory:
+            source = Path(directory)
+            workspace = source / "codex-rs"
+            workspace.mkdir()
+            inherited = {"NO_COLOR": "0", "FORCE_COLOR": "3", "COLORTERM": "truecolor", "INSTA_UPDATE": "always"}
+            with (mock.patch.dict(os.environ, inherited),
+                  mock.patch.object(workflow, "record_prepared_files"),
+                  mock.patch.object(workflow, "run") as run):
+                workflow.test_source(source)
+                test_calls = [call for call in run.call_args_list if call.args[0][:2] == ["cargo", "test"]]
+                self.assertEqual(len(test_calls), 5)
+                for call in test_calls:
+                    self.assertEqual(call.kwargs["cwd"], workspace)
+                    environment = call.kwargs["env"]
+                    self.assertEqual(environment["NO_COLOR"], "1")
+                    self.assertEqual(environment["FORCE_COLOR"], "0")
+                    self.assertEqual(environment["INSTA_UPDATE"], "no")
+                    self.assertEqual(environment["COLORTERM"], "truecolor")
+                for name, value in inherited.items():
+                    self.assertEqual(os.environ[name], value)
+
+
 class BuildCacheTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="chargesend-cache-")
