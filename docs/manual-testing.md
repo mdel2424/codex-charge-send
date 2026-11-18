@@ -76,3 +76,15 @@ release Enter and verify the next fresh Enter reaches the composer. Open the
 preset menu with its configured shortcut; Enter must neither charge nor send
 the existing draft, and releasing a preset activation key must retire its guard.
 These physical checks remain separate from automated input-routing tests.
+
+## Codex 0.169.0 checks (pending)
+
+In direct Kitty, confirm that tap starts at the selected effort and hold moves
+at constant speed; release sends once and Escape keeps the draft and images.
+Check the separate native status row remains visible while charging at narrow
+and normal widths. Switch side-chat tabs or focus the inactive pane during a
+hold; the old release must not submit a draft in the new pane. Open transcript
+copy or a centered dialog during a hold and confirm cancellation. Confirm
+menus, image paste, queued messages, and the inline Working effort still behave
+normally. Cloud submission metadata has automated coverage; live Cloud and
+physical keyboard behavior have not been checked for this release.

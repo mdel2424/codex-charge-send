@@ -11,16 +11,31 @@ permissions:
 jobs:
   workflow-tests:
     runs-on: ubuntu-24.04
+    outputs:
+      releases: ${{ steps.catalog.outputs.releases }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: python3 -m unittest discover -s tests -v
       - run: bash -n scripts/build.sh scripts/setup-ubuntu.sh scripts/fetch-upstream.sh
+      - name: Release matrix from the pinned catalog
+        id: catalog
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          catalog = json.loads(Path("supported-releases.json").read_text())
+          releases = [{"tag": tag, "rust": entry["rust"]} for tag, entry in catalog["releases"].items()]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("releases=" + json.dumps(releases) + "\n")
+          PY
 
   upstream:
+    needs: workflow-tests
     strategy:
       fail-fast: false
       matrix:
-        tag: [rust-v0.166.0, rust-v0.163.0, rust-v0.161.0, rust-v0.160.0]
+        include: ${{ fromJSON(needs.workflow-tests.outputs.releases) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -36,14 +51,21 @@ jobs:
       - name: Native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake pkg-config libssl-dev libcap-dev libclang-dev libasound2-dev libudev-dev libdbus-1-dev
+          sudo apt-get install -y cmake pkg-config libssl-dev libcap-dev libclang-dev libasound2-dev libudev-dev libdbus-1-dev bubblewrap ripgrep
       - name: Pinned Rust
-        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy --component rust-src
-      - name: Fetch, check patch, test, compile CLI and runtime helper
-        run: python3 scripts/chargesend.py build --tag '${{ matrix.tag }}' --keep-build-cache
-      - name: Scoped Rust lint check
+        run: rustup toolchain install '${{ matrix.rust }}' --profile minimal --component rustfmt --component clippy --component rust-src
+      - name: Prepare, lint first, test and package
+        run: python3 scripts/port-release.py check --tag '${{ matrix.tag }}'
+      - name: Side-chat policy integration with localhost mock backend
         working-directory: .build/upstream/${{ matrix.tag }}/codex-rs
-        run: cargo clippy --locked -p codex-tui --lib --tests
+        env:
+          NO_COLOR: "1"
+          FORCE_COLOR: "0"
+          INSTA_UPDATE: "no"
+        run: |
+          if [[ -f tui/src/app/tests/side_chat_policy_tests.rs ]]; then
+            cargo test --locked -p codex-tui --lib app::tests::side_chat_policy_tests
+          fi
       - name: Verify independent launcher
         run: |
           bundles=(dist/chargesend-*)

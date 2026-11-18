@@ -62,8 +62,15 @@ def patch_for(tag: str | None = None) -> Path:
     return ROOT / entry["patch"] if entry.get("patch") else PATCH
 
 
+def overlay_patch_for(tag: str | None = None) -> Path | None:
+    entry = CATALOG["releases"].get(tag or CATALOG["default"], {})
+    return ROOT / entry["overlay_patch"] if entry.get("overlay_patch") else None
+
+
 def fingerprint(tag: str | None = None) -> str:
     digest = hashlib.sha256(patch_for(tag).read_bytes())
+    if overlay_patch := overlay_patch_for(tag):
+        digest.update(overlay_patch.read_bytes())
     digest.update((ROOT / "overlays.json").read_bytes())
     for source, target in sorted(OVERLAYS.items()):
         digest.update(target.encode())
@@ -130,12 +137,31 @@ def apply_to(source: Path, tag: str) -> None:
         run(["git", "apply", "--check", str(patch_for(tag))], cwd=source, capture=True)
     except Failure as error:
         raise Failure(f"ChargeSend patch conflicts with {tag}. No patch was applied.\n{error}") from error
+    overlay_patch = overlay_patch_for(tag)
+    if overlay_patch is not None:
+        # Adapt release-specific APIs without duplicating the shared modules.
+        # Preflight against temporary copies before changing upstream at all.
+        try:
+            targets = {line.split("\t", 2)[2] for line in run(["git", "apply", "--numstat", str(overlay_patch)], capture=True).splitlines()}
+            if not targets or targets - set(OVERLAYS.values()):
+                raise Failure("Overlay patches may modify only the dedicated ChargeSend module files.")
+            with tempfile.TemporaryDirectory(prefix="chargesend-overlay-") as directory:
+                staging = Path(directory)
+                for origin, target in OVERLAYS.items():
+                    destination = staging / target
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(ROOT / origin, destination)
+                run(["git", "apply", "--check", str(overlay_patch)], cwd=staging, capture=True)
+        except Failure as error:
+            raise Failure(f"ChargeSend overlay patch conflicts with {tag}. No patch was applied.\n{error}") from error
     run(["git", "apply", str(patch_for(tag))], cwd=source)
     align_workspace_lock(source)
     for origin, target in OVERLAYS.items():
         destination = source / target
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / origin, destination)
+    if overlay_patch is not None:
+        run(["git", "apply", str(overlay_patch)], cwd=source)
     stamp.write_text(json.dumps(identity, indent=2) + "\n")
     record_prepared_files(source)
 
@@ -195,15 +221,8 @@ def prepare(args: argparse.Namespace) -> Path:
     return source
 
 
-def test_source(source: Path) -> None:
-    # Match upstream's justfile and Rust CI: large TUI fixtures need 8 MiB.
-    os.environ.setdefault("RUST_MIN_STACK", "8388608")
+def focused_test_filters(source: Path) -> list[str]:
     workspace = source / "codex-rs"
-    # Format using the upstream-pinned rustfmt, rather than a different host
-    # formatter. This also parses every patched module before compilation.
-    run(["cargo", "fmt", "--all"], cwd=workspace, capture=True)
-    record_prepared_files(source)
-    run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace, capture=True)
     filters = ["chargesend_", "bottom_pane::chat_composer", "chatwidget::tests::plan_mode", "tui::event_stream::tests", "status_indicator_widget::tests"]
     if (workspace / "tui/src/activation_key_guard.rs").exists():
         # 0.163 adds settings-editor handoff guards and leader-key input routing.
@@ -211,12 +230,28 @@ def test_source(source: Path) -> None:
     if (workspace / "tui/src/chatwidget/quick_dials.rs").exists():
         # 0.166 adds preset-menu and keyboard transcript-selection release guards.
         filters += ["chatwidget::tests::quick_dials_tests", "app::tests::transcript_selection", "app::tests::copy_mode_tests", "app_backtrack::tests", "transcript_view::", "tui::keyboard_modes::tests"]
+    if (workspace / "tui/src/chatwidget/input_receipts.rs").exists():
+        # 0.169 preserves direct-Enter admission and side-chat ownership.
+        filters += ["chatwidget::tests::composer_submission", "chatwidget::tests::side", "app::side::tests"]
+    return filters
+
+
+def test_environment() -> dict[str, str]:
     # Match the upstream snapshots' noninteractive palette even when building
     # from Kitty. Keep these settings local to test children; the installed TUI
     # must still detect and use the user's terminal colors normally. Failed
     # snapshots must not leave .snap.new files in the guarded source checkout.
-    test_env = {**os.environ, "NO_COLOR": "1", "FORCE_COLOR": "0", "INSTA_UPDATE": "no"}
-    for filter_name in filters:
+    return {"RUST_MIN_STACK": "8388608", **os.environ, "NO_COLOR": "1", "FORCE_COLOR": "0", "INSTA_UPDATE": "no"}
+
+
+def test_source(source: Path) -> None:
+    os.environ.setdefault("RUST_MIN_STACK", "8388608")
+    workspace = source / "codex-rs"
+    run(["cargo", "fmt", "--all"], cwd=workspace, capture=True)
+    record_prepared_files(source)
+    run(["cargo", "fmt", "--all", "--", "--check"], cwd=workspace, capture=True)
+    test_env = test_environment()
+    for filter_name in focused_test_filters(source):
         run(["cargo", "test", "--locked", "-p", "codex-tui", "--lib", filter_name], cwd=workspace, env=test_env)
 
 
@@ -279,7 +314,8 @@ print(json.dumps(resolve_codex_v8_cargo_env(
     return {**os.environ, **overrides}
 
 
-def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = None) -> Path:
+def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = None, *, runner=None) -> Path:
+    invoke = runner or run
     cargo_manifest = tomllib.loads((source / "codex-rs/cli/Cargo.toml").read_text())
     package_name = cargo_manifest["package"]["name"]
     if not any(binary.get("name") == "codex" for binary in cargo_manifest.get("bin", [])):
@@ -288,11 +324,11 @@ def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = N
     helper = code_mode_host or installed_code_mode_host(tag)
     if helper is not None and (not helper.is_file() or not os.access(helper, os.X_OK)):
         raise Failure(f"{helper} is not an executable code-mode runtime helper.")
-    run(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
+    invoke(["cargo", "build", "--locked", "-p", package_name, "--bin", "codex", "--profile", profile], cwd=workspace)
     apply_to(source, tag)
-    target_triple = next(line.removeprefix("host: ") for line in run(["rustc", "-vV"], cwd=workspace, capture=True).splitlines() if line.startswith("host: "))
+    target_triple = next(line.removeprefix("host: ") for line in invoke(["rustc", "-vV"], cwd=workspace, capture=True).splitlines() if line.startswith("host: "))
     if helper is None:
-        run(["cargo", "build", "--locked", "-p", "codex-code-mode-host", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace,
+        invoke(["cargo", "build", "--locked", "-p", "codex-code-mode-host", "--bin", "codex-code-mode-host", "--profile", profile], cwd=workspace,
             env=code_mode_build_env(source, target_triple))
     # Refuse a misleading manifest if patch inputs or prepared source changed
     # while the compiler was running.
@@ -317,7 +353,7 @@ def bundle(source: Path, tag: str, profile: str, code_mode_host: Path | None = N
         "product": "ChargeSend", "version": VERSION,
         "upstream_tag": tag, "upstream_commit": release(tag)["commit"],
         "patch_fingerprint": fingerprint(tag), "profile": profile,
-        "target": target_triple, "rustc": run(["rustc", "--version"], cwd=workspace, capture=True),
+        "target": target_triple, "rustc": invoke(["rustc", "--version"], cwd=workspace, capture=True),
         "cargo_lock_sha256": sha256(workspace / "Cargo.lock"),
         "upstream_cargo_lock_sha256": hashlib.sha256(subprocess.check_output(["git", "show", "HEAD:codex-rs/Cargo.lock"], cwd=source)).hexdigest(),
         "lock_adjustment": "only inherited local workspace package versions aligned; third-party pins unchanged",

@@ -1,6 +1,7 @@
 """Test real patch/file/launcher operations without a compiler or live backend."""
 
 import argparse
+import difflib
 import fcntl
 import importlib.util
 import json
@@ -103,6 +104,42 @@ class PatchWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(workflow.Failure, "expected rust-v0.161.0"):
             workflow.checkout("rust-v0.161.0", str(self.source))
 
+    def overlay_patch(self, conflict=False):
+        origin, target = next(iter(workflow.OVERLAYS.items()))
+        original = (ROOT / origin).read_text().splitlines(keepends=True)
+        patch = self.directory / "overlay.patch"
+        if conflict:
+            original[0] = "absent fixture line\n"
+        modified = original[:1] + ["// Release-specific fixture adaptation.\n"] + original[1:]
+        patch.write_text("".join(difflib.unified_diff(original, modified, fromfile=f"a/{target}", tofile=f"b/{target}")))
+        return patch, target
+
+    def test_release_overlay_patch_applies_after_copy_and_is_fingerprinted(self):
+        patch, target = self.overlay_patch()
+        with mock.patch.dict(workflow.CATALOG["releases"], {"fixture": {"overlay_patch": str(patch)}}):
+            workflow.apply_to(self.source, "fixture")
+            self.assertIn("Release-specific fixture adaptation.", (self.source / target).read_text())
+            workflow.apply_to(self.source, "fixture")
+            patch.write_text(patch.read_text() + "\n")
+            with self.assertRaisesRegex(workflow.Failure, "different ChargeSend patch"):
+                workflow.apply_to(self.source, "fixture")
+
+    def test_overlay_conflict_does_not_apply_the_main_patch_or_copy_modules(self):
+        patch, target = self.overlay_patch(conflict=True)
+        with mock.patch.dict(workflow.CATALOG["releases"], {"fixture": {"overlay_patch": str(patch)}}):
+            with self.assertRaisesRegex(workflow.Failure, "overlay patch conflicts"):
+                workflow.apply_to(self.source, "fixture")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        self.assertFalse((self.source / target).exists())
+
+    def test_overlay_patch_cannot_modify_other_upstream_files(self):
+        patch = self.directory / "overlay.patch"
+        patch.write_text(self.patch.read_text())
+        with mock.patch.dict(workflow.CATALOG["releases"], {"fixture": {"overlay_patch": str(patch)}}):
+            with self.assertRaisesRegex(workflow.Failure, "only the dedicated ChargeSend module files"):
+                workflow.apply_to(self.source, "fixture")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+
     def test_release_lock_alignment_only_changes_local_versions(self):
         (self.source / "codex-rs/Cargo.toml").write_text('[workspace.package]\nversion = "0.161.0"\n')
         (self.source / "codex-rs/tui/Cargo.toml").write_text('[package]\nname = "codex-tui"\nversion.workspace = true\n')
@@ -124,6 +161,21 @@ class PatchWorkflowTests(unittest.TestCase):
 
 
 class TestEnvironmentTests(unittest.TestCase):
+    def test_receipt_aware_releases_include_submission_and_side_chat_regressions(self):
+        with tempfile.TemporaryDirectory(prefix="chargesend-test-filters-") as directory:
+            source = Path(directory)
+            receipts = source / "codex-rs/tui/src/chatwidget/input_receipts.rs"
+            receipts.parent.mkdir(parents=True)
+            receipts.touch()
+            with (mock.patch.object(workflow, "record_prepared_files"),
+                  mock.patch.object(workflow, "run") as run):
+                workflow.test_source(source)
+                filters = [call.args[0][-1] for call in run.call_args_list if call.args[0][:2] == ["cargo", "test"]]
+            self.assertEqual(filters[-3:], [
+                "chatwidget::tests::composer_submission", "chatwidget::tests::side",
+                "app::side::tests",
+            ])
+
     def test_interactive_colors_and_snapshot_updates_do_not_leak_into_rust_tests(self):
         with tempfile.TemporaryDirectory(prefix="chargesend-test-env-") as directory:
             source = Path(directory)

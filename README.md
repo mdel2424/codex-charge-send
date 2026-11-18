@@ -13,8 +13,9 @@ terminal interface, authentication, settings, and agent functionality.
 ChargeSend extends Codex's Rust `codex-tui` crate. The release-specific diffs in
 [patches/](patches/) integrate with keyboard setup, event dispatch, the composer,
 and prompt submission. [overlays.json](overlays.json) maps the dedicated Rust
-modules into the upstream checkout; those modules are shared by the 0.166.0, 0.163.0, 0.161.0, and
-0.160.0 patches.
+modules into the upstream checkout; those modules are shared across the supported releases.
+The 0.169.0 overlay patch adapts image-attachment test APIs and the composer
+snapshot to its separate status row.
 
 **Keyboard negotiation.** [capability.rs](module/chargesend/capability.rs) enables
 charging only after the keyboard-mode request succeeds and Codex's terminal probe
@@ -50,6 +51,9 @@ input continue through their existing handlers. On 0.163.0 and later, consumed r
 still notify settings-editor activation guards and covered views, without
 dispatching another menu action. The 0.166.0 port also retires transcript
 selection/copy exit guards and preset-menu guards on consumed releases.
+The 0.169.0 port also preserves direct-Enter admission metadata, pauses charging
+while transcript copying owns input, and hides the bar in inactive panes and
+dialog backdrops.
 
 **Request settings.** Effort choices come from the active model's
 `supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
@@ -85,6 +89,11 @@ backend that simulates sticky effort settings. GitHub Actions applies, tests,
 lints, and builds the supported releases, then checks launcher installation and
 removal.
 
+Future release ports use the [resumable update pipeline](docs/build.md#prepare-test-build)
+and [repository skill](skills/chargesend-update/SKILL.md). It checks lint first,
+collects test failures in one pass, and reuses verified stages and compiler
+artifacts while the port is being fixed.
+
 ## Setup
 
 Use Ubuntu 26.04 and a direct Kitty terminal, outside tmux, Screen, Zellij, or SSH.
@@ -96,14 +105,15 @@ From the repository directory:
 ```bash
 bash scripts/setup-ubuntu.sh
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.166.0
+python3 scripts/chargesend.py build --tag rust-v0.169.0
 python3 scripts/chargesend.py install \
-  --bundle dist/chargesend-0.1.0-codex-0.166.0-x86_64-unknown-linux-gnu-dev \
+  --bundle dist/chargesend-0.1.0-codex-0.169.0-x86_64-unknown-linux-gnu-dev \
   --as-codex
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The setup script installs Rust 1.95.0, native build dependencies, and Kitty.
+The setup script installs Rust 1.95.0, native build dependencies, bubblewrap,
+ripgrep, and Kitty.
 Installation places ChargeSend under `~/.local`. `--as-codex` makes `codex` launch
 ChargeSend and saves the original command as `codex-stock`.
 

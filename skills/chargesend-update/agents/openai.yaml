@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update ChargeSend"
+  short_description: "Port ChargeSend to a newer Codex release"
+  default_prompt: "Use $chargesend-update to update this repository to a newer stable Codex release, verify the patch and CLI, and preserve the existing installation until the bundle is ready."

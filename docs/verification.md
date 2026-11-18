@@ -1,9 +1,48 @@
 # Verification record
 
-Current default: **Codex 0.166.0**, ported on 2026-11-01, pinned to commit
+Update workflow verification on 2026-11-18: **76 Python tests** passed, including
+real temporary Git repositories and executable fixtures for the new pipeline.
+The cached 0.169.0 release passed actual staging, byte-identical dry-run export,
+independent patch reconstruction, and native bundle startup/checksum checks.
+Certification preserved Rust source mtimes. The skill validator also passed.
+This workflow change did not alter Rust sources or rebuild the installed CLI;
+the release build results below retain their original test scope and counts.
+Remote Actions execution remains unverified.
+
+Current default: **Codex 0.169.0**, ported on 2026-11-17, pinned to commit
+`d32063f96c2dff1dc96af839b3952abb6acfeda4`. The complete build workflow passed
+**1,019 focused Rust tests** across 19 filters, pinned formatting, and native CLI
+compilation. **53 Python workflow tests** and scoped Clippy passed without
+warnings. The final CLI, executor entry point, and matching official 0.169.0
+JavaScript helper passed startup checks. Distribution and project-local bundles
+match the current patch fingerprint and executable checksums. Installation under
+`~/.local` completed from the user's terminal. Both `codex` and `chargesend`
+report ChargeSend 0.1.0 on Codex 0.169.0; command mapping, checksums, current
+fingerprint, and native startup passed verification. Stock 0.166.0 and 0.161.0
+backups remain intact, and compiled caches were removed.
+
+This port preserves native direct-Enter admission metadata, cancels charging
+while transcript copying owns input, and hides the charge footer in inactive
+panes and dialog backdrops. Three added tests cover those cases. Shared charging
+modules are unchanged; a small, fingerprinted overlay patch adapts the image
+attachment test API and the separate native status row. Two upstream Working-row
+snapshots now include the intended reasoning label. Both clean release
+checkouts produced identical prepared inputs. The existing 0.166.0 fingerprint
+and source integrity checks still pass; older baselines were not recompiled.
+
+The local checks include actual composer/request code and a mock sticky backend,
+with no live inference. An additional upstream side-chat policy integration test
+cannot bind its localhost HTTP mock server in this sandbox. It is configured
+in GitHub Actions for 0.169.0 and has not passed locally. Remote GitHub Actions,
+physical Kitty testing, and live Cloud behavior have not been verified for this
+revision. See [manual-testing.md](manual-testing.md),
+[source-provenance-0.169.0.json](source-provenance-0.169.0.json), and
+[build-results.json](build-results.json) for scope and pinned inputs.
+
+Previous baseline: **Codex 0.166.0**, ported on 2026-11-01, pinned to commit
 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`. The complete build workflow passed
 887 focused Rust tests, pinned formatting, and native CLI compilation. Scoped
-Clippy previously passed without warnings; 49 Python workflow tests now pass. Native
+Clippy previously passed without warnings; 49 Python workflow tests passed for that revision. Native
 CLI/version/help, the executor subcommand, and the matching official JavaScript
 helper passed startup checks. The bundle is prepared under `dist/` and `local/`.
 The normal `~/.local` installation was updated from the user's terminal on
@@ -20,7 +59,7 @@ one-command updater passed an actual project-local installation and repeat
 update under forced truecolor, reusing the verified bundle without recompiling.
 Its output is saved automatically in `.build/update-local.log`. Stock-backup
 archiving, rollback on mapping failure, and persistent error logging have
-automated coverage. The usual `~/.local/bin/codex` now launches ChargeSend
+automated coverage. At that revision, `~/.local/bin/codex` launched ChargeSend
 0.1.0 on Codex 0.166.0. `codex-stock` retains stock 0.166.0 and
 `codex-stock.previous-1` retains stock 0.161.0; both versions were verified.
 Compiled caches were removed. Clippy was not rerun for these Python-only changes.

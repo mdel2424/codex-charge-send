@@ -1,7 +1,7 @@
 {
   "product": "ChargeSend",
   "version": "0.1.0",
-  "date": "2026-11-02",
+  "date": "2026-11-17",
   "platform": "Ubuntu 26.04, x86_64 Linux",
   "releases": {
     "rust-v0.161.0": {
@@ -112,11 +112,59 @@
         "installation": "User ran the updater; installed checksums, current patch fingerprint, native help, codex mapping and both stock backup versions verified.",
         "compiled_cache": "removed after successful verification"
       }
+    },
+    "rust-v0.169.0": {
+      "upstream_commit": "d32063f96c2dff1dc96af839b3952abb6acfeda4",
+      "patch_fingerprint": "c120e57fd4538963df0da8d49417111ae22bc0284dfec81f1a435886cbc58016",
+      "binary_sha256": "e95a7f2b5e97dfd6c7fead3750d0b9cceff7685724bb7ae78f76f4aa1f2401f5",
+      "code_mode_host_sha256": "e9f2ef68671b2b6ac68902d19e8dafda3f5928e678ecf3f30c74b203a2c403ed",
+      "code_mode_host_origin": "prebuilt helper: /home/mdel2424/.codex/packages/app-server-daemon/releases/0.169.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host",
+      "cargo_lock_sha256": "200de438778a44c55d452b8931f5293ec3d7bda66c48717605b202764a4d3f7a",
+      "upstream_cargo_lock_sha256": "56e04c89b25a6efa1fa6f1cf02934e92451933c8ebda57a5153207ba9ea9fb9e",
+      "bundle": "dist/chargesend-0.1.0-codex-0.169.0-x86_64-unknown-linux-gnu-dev",
+      "native_compilation": "passed",
+      "rust_tests": {
+        "chargesend": 48,
+        "composer": 448,
+        "plan_mode": 61,
+        "event_stream": 10,
+        "working_status": 10,
+        "activation_key_guard": 1,
+        "config_panel": 19,
+        "app_input": 3,
+        "key_chords": 27,
+        "view_transition_guard": 1,
+        "quick_dials": 2,
+        "transcript_selection": 2,
+        "copy_mode": 1,
+        "app_backtrack": 11,
+        "transcript_view": 273,
+        "keyboard_modes": 16,
+        "composer_submission": 69,
+        "side_chat": 13,
+        "app_side": 4
+      },
+      "total_rust_tests": 1019,
+      "clippy": "passed: cargo clippy --locked -p codex-tui --lib --tests; no warnings",
+      "revision": "0.169.0 port; direct-Enter admission retained; provider/copy guards and focused footer rendering preserved; shared charging modules unchanged; small release-specific test overlay patch",
+      "installation": "installed and verified at ~/.local: codex and chargesend launch ChargeSend 0.1.0 on Codex 0.169.0; current patch fingerprint and executable checksums match; stock backups 0.166.0 and 0.161.0 retained; compiled cache removed",
+      "physical_keyboard_check": "not repeated on 0.169.0",
+      "localhost_policy_test": "Blocked by sandbox denial of localhost port binding; configured as an additional GitHub Actions check; no live inference.",
+      "verification_scope": "All 19 focused filters passed in the reproducible build workflow; source and overlay preflight verified against two clean checkouts; final native version/help, executor and matching JavaScript helper startup, bundle and installed checksums passed; old 0.166.0 fingerprint unchanged; older releases not rebuilt."
     }
   },
-  "python_workflow_tests": 49,
+  "python_workflow_tests": 53,
   "physical_keyboard_evidence": "kitty-0.45.0-enter.json",
   "physical_ui_evidence": "kitty-0.45.0-ui.json",
   "github_actions": "not run during this local verification",
-  "live_inference": "not used"
+  "live_inference": "not used",
+  "update_pipeline": {
+    "date": "2026-11-18",
+    "workflow_tests": 76,
+    "skill_validation": "passed skill-creator quick_validate",
+    "pipeline_tests": "Real temporary Git releases and executable/Cargo-command fixtures cover pinning, resume, patch proof, check ordering, all-failure collection, cache invalidation, corrupt artifacts, concurrent edits and promotion.",
+    "actual_source_check": "Cached Codex 0.169.0 staged, dry-run exported byte-identically, and independently reconstructed; Rust source mtimes unchanged.",
+    "native_cli": "Existing 0.169.0 bundle version/startup/fingerprint verified; no Rust source changes or CLI rebuild in this pipeline task.",
+    "ci": "Catalog-driven tag/toolchain matrix and lint-first pipeline configured; remote Actions not run."
+  }
 }

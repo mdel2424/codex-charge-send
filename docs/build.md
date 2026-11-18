@@ -11,19 +11,56 @@ binary bytes can still vary with native compilers, OS libraries, and paths.
 
 ## Prepare, test, build
 
+For future release ports, use the resumable workflow:
+
+```bash
+python3 scripts/port-release.py start --fetch
+# Review the reported tag and resolve any rejected hunks in its source checkout.
+python3 scripts/port-release.py export --tag TAG
+python3 scripts/port-release.py check --tag TAG
+python3 scripts/port-release.py promote --tag TAG
+```
+
+Replace `TAG` with the stable `rust-v...` tag reported by `start`. `start --tag`
+selects a particular release. A port keeps one source path throughout editing;
+independent reconstruction verifies the exported patch without resetting that
+checkout or rewriting unchanged Rust files. Lint runs before test code generation
+and packaging. All failing focused test filters are reported together.
+
+Check receipts bind the source, toolchain, compiler flags and pipeline version.
+`check --through lint` or `--through tests` stops early; repeated checks reuse
+matching successes. External snapshot edits rerun tests while retaining the lint
+result. `--force` reruns checks after changes outside the recorded inputs. Logs
+and the previous attempt are under `.build/updates/TAG/`. Intermediate checks
+keep the shared cache; promotion cleans it unless `--keep-build-cache` is set.
+Promotion does not install or publish. Activate the verified bundle with
+`python3 scripts/update-local.py` when ready.
+
+[AGENTS.md](../AGENTS.md) routes future Codex sessions to the repository-local
+[update skill](../skills/chargesend-update/SKILL.md). No global skill installation
+is needed for sessions in this repository. Breaking upstream changes still
+require a reviewed port; a cold Rust build still takes time.
+
+The lower-level commands below remain available for direct builds.
+
 Run `bash scripts/setup-ubuntu.sh` once in a normal Ubuntu terminal. It installs
-Rust 1.95.0 with rustfmt, clippy and rust-src, native development packages, and
-Kitty. It does not install or replace a Codex binary.
+Rust 1.95.0 with rustfmt, clippy and rust-src, native development packages,
+bubblewrap, ripgrep, and Kitty. It does not install or replace a Codex binary.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.166.0 --profile dev
+python3 scripts/chargesend.py build --tag rust-v0.169.0 --profile dev
 ```
 
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
 checks the entire patch before applying it, and copies `overlays.json` modules.
 `test` uses pinned rustfmt and runs ChargeSend, existing composer, Plan-mode, and
 event-stream tests. `build` repeats those checks before compiling `codex-cli`.
+Recent releases also run transcript-selection, activation-guard, submission,
+and side-chat regressions. The 0.169.0 CI job additionally runs a side-chat
+policy test against a localhost HTTP mock backend. That extra check cannot run
+in a sandbox that denies binding a local port; the normal focused workflow
+captures submitted operations and sticky effort settings without a listener.
 It reuses `codex-code-mode-host` from an installed official package of the exact
 baseline version when available; otherwise it compiles the helper separately
 from the pinned source. Source builds use upstream's package resolver to fetch
@@ -38,7 +75,7 @@ The test runner uses an 8 MiB thread stack, matching upstream's test workflow.
 The standalone patch workflow uses Cargo's lib-test runner with focused filters.
 During local verification, upstream's `just`, nextest, and cargo-insta frontends
 were unavailable in the offline cache; inline snapshots were reviewed directly.
-Only Rust sources change in upstream, so the workflow runs its pinned rustfmt
+Upstream changes are limited to TUI Rust sources and test snapshots, so the workflow runs its pinned rustfmt
 without the unrelated Python, Bazel, and justfile formatters.
 
 Use `--source /path/to/clean/upstream` to supply a full checkout already at the
@@ -63,7 +100,7 @@ do not need downloading again. Failed builds retain artifacts so they can resume
 For repeated development, keep the cache until finished:
 
 ```bash
-python3 scripts/chargesend.py build --tag rust-v0.166.0 --keep-build-cache
+python3 scripts/chargesend.py build --tag rust-v0.169.0 --keep-build-cache
 python3 scripts/chargesend.py clean
 ```
 
@@ -93,7 +130,7 @@ When an agent session has no network but your normal terminal does, run:
 bash scripts/fetch-upstream.sh
 export CARGO_HOME="$PWD/.build/cargo"
 export CARGO_NET_OFFLINE=true
-python3 scripts/chargesend.py build --tag rust-v0.166.0
+python3 scripts/chargesend.py build --tag rust-v0.169.0
 ```
 
 The download script fetches all catalogued release checkouts and their locked
@@ -101,6 +138,13 @@ Cargo dependencies into the workspace. Pass a tag to download only that release.
 Sources are left unpatched. Rust must already be installed for the selected releases.
 Some dependencies have build-time downloads outside Cargo; if an offline build
 reports one, obtain that exact artifact in your normal terminal as well.
+
+The 0.169.0 release has a small supplementary overlay patch listed in
+`supported-releases.json`. It adapts the shared test modules to upstream API and
+layout changes. Both patches are included in the fingerprint. The workflow
+checks the overlay patch against temporary module copies before changing the
+upstream checkout, then applies it after copying the modules. Older releases
+retain their existing patches and fingerprints.
 
 ## Output and installation
 

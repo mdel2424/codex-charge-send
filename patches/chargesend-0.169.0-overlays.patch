@@ -1,0 +1,54 @@
+--- a/codex-rs/tui/src/chatwidget/chargesend_tests.rs
++++ b/codex-rs/tui/src/chatwidget/chargesend_tests.rs
+@@ -213,7 +213,10 @@
+ async fn chargesend_escape_retains_draft_and_attachment() {
+     let (mut chat, _rx, mut op_rx) = fixture().await;
+     draft(&mut chat, "keep this");
+-    chat.attach_image(PathBuf::from("/tmp/chargesend-image.png"));
++    chat.attach_image(
++        PathBuf::from("/tmp/chargesend-image.png"),
++        ClipboardPasteContext::Composer,
++    );
+     let before = chat.bottom_pane.composer_text();
+     enter(&mut chat, KeyEventKind::Press);
+     assert!(chat.chargesend_active());
+@@ -568,7 +571,7 @@
+         .unwrap();
+     chat.snapshot_local_images = true;
+     draft(&mut chat, "image prompt");
+-    chat.attach_image(path);
++    chat.attach_image(path, ClipboardPasteContext::Composer);
+     assert!(chat.current_model_supports_images());
+     assert!(
+         chat.chargesend_context().is_some(),
+@@ -641,18 +644,21 @@
+     › hello
+ 
+ 
++      GPT-5…
+       Low
+ 
+     24 columns:
+ 
+     › hello
+ 
++      GPT-5.6-Sol low · /tm…
+       Low        [----------
+ 
+     80 columns:
+ 
+     › hello
+ 
++      GPT-5.6-Sol low · /tmp/project
+       Low        [------------] ^ · release Enter to send · Esc cancels
+     ");
+ }
+@@ -667,7 +673,7 @@
+         .unwrap();
+     chat.snapshot_local_images = true;
+     draft(&mut chat, "keep image");
+-    chat.attach_image(path);
++    chat.attach_image(path, ClipboardPasteContext::Composer);
+     enter(&mut chat, KeyEventKind::Press);
+     assert!(
+         chat.chargesend_active(),

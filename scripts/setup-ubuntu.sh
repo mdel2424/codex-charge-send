@@ -3,7 +3,7 @@
 set -euo pipefail
 sudo apt-get update
 sudo apt-get install -y build-essential git curl cmake pkg-config libssl-dev \
-  libcap-dev libclang-dev libasound2-dev libudev-dev libdbus-1-dev kitty
+  libcap-dev libclang-dev libasound2-dev libudev-dev libdbus-1-dev bubblewrap ripgrep kitty
 chargesend_installer=$(mktemp)
 trap 'rm -f "$chargesend_installer"' EXIT
 curl --proto '=https' --tlsv1.2 --fail --location https://sh.rustup.rs \
