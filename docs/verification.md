@@ -1,5 +1,32 @@
 # Verification record
 
+Current default: **Codex 0.170.0**, ported on 2026-11-19 and pinned to
+commit `29eb79e9866b3262a777fdf8195c1b9e63684c91`. The final exported inputs
+passed **76 Python workflow tests**, scoped Clippy without warnings, and all
+19 focused Rust test filters: **1,021 executions covering 1,020 distinct tests**.
+The overlapping composer/footer test is counted once in the distinct total.
+The native CLI was compiled with Rust 1.95.0. Version/help, executor entrypoint,
+and the matching official JavaScript helper passed startup checks. Distribution
+and project-local installation fingerprints and executable checksums match.
+Managed compiled caches were removed after promotion. Activation under
+`~/.local` remains pending; the active machine command still reports 0.166.0.
+
+The 0.169.0 integration applied cleanly to the new release. The 0.170.0 port
+adds cancellation when a Cloud thread's stream disconnects, even if reconnect
+completes before the next terminal event. Its regression test verifies that a
+cancelled release retains the draft and that a fresh Enter while disconnected
+keeps native queueing behavior. Shared charging modules and the 0.169.0 patch
+fingerprint are unchanged. The supplemental overlay preserves release-specific
+test and status-row adaptations. Source proof preserved the editable checkout.
+
+No live inference was used. The separate HTTP mock integration cannot run in
+this sandbox because binding localhost is denied (`Operation not permitted`).
+Remote GitHub Actions, physical Kitty checks, and live Cloud reconnect behavior
+remain unverified for this port. See
+[source-provenance-0.170.0.json](source-provenance-0.170.0.json),
+[build-results.json](build-results.json), and
+[manual-testing.md](manual-testing.md) for pinned inputs and remaining checks.
+
 Update workflow verification on 2026-11-18: **76 Python tests** passed, including
 real temporary Git repositories and executable fixtures for the new pipeline.
 The cached 0.169.0 release passed actual staging, byte-identical dry-run export,
@@ -9,7 +36,7 @@ This workflow change did not alter Rust sources or rebuild the installed CLI;
 the release build results below retain their original test scope and counts.
 Remote Actions execution remains unverified.
 
-Current default: **Codex 0.169.0**, ported on 2026-11-17, pinned to commit
+Previous baseline: **Codex 0.169.0**, ported on 2026-11-17, pinned to commit
 `d32063f96c2dff1dc96af839b3952abb6acfeda4`. The complete build workflow passed
 **1,019 focused Rust tests** across 19 filters, pinned formatting, and native CLI
 compilation. **53 Python workflow tests** and scoped Clippy passed without

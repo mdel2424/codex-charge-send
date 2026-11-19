@@ -1,5 +1,5 @@
 {
-  "default": "rust-v0.169.0",
+  "default": "rust-v0.170.0",
   "upstream": "https://github.com/openai/codex.git",
   "releases": {
     "rust-v0.169.0": {
@@ -31,6 +31,14 @@
       "rust": "1.95.0",
       "patch": "patches/chargesend-0.160.0.patch",
       "status": "native CLI compiled; 510 focused/regression Rust tests passed, including inline active-turn effort, narrow-width protection and queued-turn transitions; matching official runtime helper; working-row physical UI check pending"
+    },
+    "rust-v0.170.0": {
+      "commit": "29eb79e9866b3262a777fdf8195c1b9e63684c91",
+      "rust": "1.95.0",
+      "patch": "patches/chargesend-0.170.0.patch",
+      "overlay_patch": "patches/chargesend-0.170.0-overlays.patch",
+      "development": false,
+      "status": "native CLI compiled and verified; 1,020 distinct focused Rust tests, 76 workflow tests and scoped Clippy passed; project-local installation verified; ~/.local activation, physical Kitty and remote CI checks pending"
     }
   }
 }

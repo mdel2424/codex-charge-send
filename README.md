@@ -14,7 +14,7 @@ ChargeSend extends Codex's Rust `codex-tui` crate. The release-specific diffs in
 [patches/](patches/) integrate with keyboard setup, event dispatch, the composer,
 and prompt submission. [overlays.json](overlays.json) maps the dedicated Rust
 modules into the upstream checkout; those modules are shared across the supported releases.
-The 0.169.0 overlay patch adapts image-attachment test APIs and the composer
+The 0.170.0 overlay patch adapts image-attachment test APIs and the composer
 snapshot to its separate status row.
 
 **Keyboard negotiation.** [capability.rs](module/chargesend/capability.rs) enables
@@ -53,7 +53,9 @@ dispatching another menu action. The 0.166.0 port also retires transcript
 selection/copy exit guards and preset-menu guards on consumed releases.
 The 0.169.0 port also preserves direct-Enter admission metadata, pauses charging
 while transcript copying owns input, and hides the bar in inactive panes and
-dialog backdrops.
+dialog backdrops. The 0.170.0 port cancels a held charge on a Cloud thread
+stream disconnect, including a reconnect completed before the next key event.
+A fresh Enter while disconnected retains native queueing behavior.
 
 **Request settings.** Effort choices come from the active model's
 `supported_reasoning_efforts`, with duplicates and Ultra removed. Advertised Max
@@ -105,9 +107,9 @@ From the repository directory:
 ```bash
 bash scripts/setup-ubuntu.sh
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.169.0
+python3 scripts/chargesend.py build --tag rust-v0.170.0
 python3 scripts/chargesend.py install \
-  --bundle dist/chargesend-0.1.0-codex-0.169.0-x86_64-unknown-linux-gnu-dev \
+  --bundle dist/chargesend-0.1.0-codex-0.170.0-x86_64-unknown-linux-gnu-dev \
   --as-codex
 export PATH="$HOME/.local/bin:$PATH"
 ```

@@ -88,3 +88,12 @@ copy or a centered dialog during a hold and confirm cancellation. Confirm
 menus, image paste, queued messages, and the inline Working effort still behave
 normally. Cloud submission metadata has automated coverage; live Cloud and
 physical keyboard behavior have not been checked for this release.
+
+## Codex 0.170.0 checks (pending)
+
+Repeat the direct-Kitty tap, selected-effort start, constant-speed hold, descending
+release, and Escape checks on the new native bundle. Verify the Working effort
+label and cancellation across the updated sidebar and panel routes. For a Cloud
+thread, disconnect during a hold and release after reconnecting: the draft must
+remain unsent. A fresh Enter while disconnected should use normal queueing.
+These physical-keyboard and live Cloud checks have not been run for this port.

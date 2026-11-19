@@ -49,7 +49,7 @@ bubblewrap, ripgrep, and Kitty. It does not install or replace a Codex binary.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-python3 scripts/chargesend.py build --tag rust-v0.169.0 --profile dev
+python3 scripts/chargesend.py build --tag rust-v0.170.0 --profile dev
 ```
 
 `prepare` obtains a full checkout in `.build/upstream/<tag>`, verifies the commit,
@@ -57,7 +57,7 @@ checks the entire patch before applying it, and copies `overlays.json` modules.
 `test` uses pinned rustfmt and runs ChargeSend, existing composer, Plan-mode, and
 event-stream tests. `build` repeats those checks before compiling `codex-cli`.
 Recent releases also run transcript-selection, activation-guard, submission,
-and side-chat regressions. The 0.169.0 CI job additionally runs a side-chat
+and side-chat regressions. CI additionally runs a side-chat
 policy test against a localhost HTTP mock backend. That extra check cannot run
 in a sandbox that denies binding a local port; the normal focused workflow
 captures submitted operations and sticky effort settings without a listener.
@@ -100,7 +100,7 @@ do not need downloading again. Failed builds retain artifacts so they can resume
 For repeated development, keep the cache until finished:
 
 ```bash
-python3 scripts/chargesend.py build --tag rust-v0.169.0 --keep-build-cache
+python3 scripts/chargesend.py build --tag rust-v0.170.0 --keep-build-cache
 python3 scripts/chargesend.py clean
 ```
 
@@ -130,7 +130,7 @@ When an agent session has no network but your normal terminal does, run:
 bash scripts/fetch-upstream.sh
 export CARGO_HOME="$PWD/.build/cargo"
 export CARGO_NET_OFFLINE=true
-python3 scripts/chargesend.py build --tag rust-v0.169.0
+python3 scripts/chargesend.py build --tag rust-v0.170.0
 ```
 
 The download script fetches all catalogued release checkouts and their locked
@@ -139,7 +139,7 @@ Sources are left unpatched. Rust must already be installed for the selected rele
 Some dependencies have build-time downloads outside Cargo; if an offline build
 reports one, obtain that exact artifact in your normal terminal as well.
 
-The 0.169.0 release has a small supplementary overlay patch listed in
+The 0.170.0 release has a small supplementary overlay patch listed in
 `supported-releases.json`. It adapts the shared test modules to upstream API and
 layout changes. Both patches are included in the fingerprint. The workflow
 checks the overlay patch against temporary module copies before changing the
